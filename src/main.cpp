@@ -1,9 +1,9 @@
-#include <opendxa/cli/common.h>
-#include <opendxa/wrappers/elastic_strain.h>
-#include <opendxa/structures/crystal_structure_types.h>
+#include <volt/cli/common.h>
+#include <volt/elastic_strain_service.h>
+#include <volt/structures/crystal_structure_types.h>
 
-using namespace OpenDXA;
-using namespace OpenDXA::CLI;
+using namespace Volt;
+using namespace Volt::CLI;
 
 LatticeStructureType parseCrystalStructure(const std::string& str) {
     if (str == "FCC") return LATTICE_FCC;
@@ -17,7 +17,7 @@ LatticeStructureType parseCrystalStructure(const std::string& str) {
 }
 
 void showUsage(const std::string& name) {
-    printUsageHeader(name, "OpenDXA - Elastic Strain Analysis");
+    printUsageHeader(name, "Volt - Elastic Strain Analysis");
     std::cerr
         << "  --crystalStructure <type>     Crystal structure. (BCC|FCC|HCP|...) [default: BCC]\n"
         << "  --latticeConstant <float>     Lattice constant a₀. [required]\n"
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]){
     }
 
     auto parallel = initParallelism(opts, false);
-    initLogging("opendxa-elastic-strain", parallel.threads);
+    initLogging("volt-elastic-strain", parallel.threads);
 
     LammpsParser::Frame frame;
     if(!parseFrame(filename, frame)) return 1;
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]){
     outputBase = deriveOutputBase(filename, outputBase);
     spdlog::info("Output base: {}", outputBase);
 
-    ElasticStrainWrapper analyzer;
+    ElasticStrainService analyzer;
     analyzer.setInputCrystalStructure(parseCrystalStructure(getString(opts, "--crystalStructure", "BCC")));
     analyzer.setParameters(
         getDouble(opts, "--latticeConstant", 1.63),

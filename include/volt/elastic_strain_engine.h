@@ -1,15 +1,15 @@
 #pragma once
 
-#include <opendxa/analysis/structure_analysis.h>
-#include <opendxa/core/particle_property.h>
-#include <opendxa/core/simulation_cell.h>
-#include <opendxa/analysis/analysis_context.h>
-#include <opendxa/structures/cluster_graph.h>
+#include <volt/analysis/structure_analysis.h>
+#include <volt/core/particle_property.h>
+#include <volt/core/simulation_cell.h>
+#include <volt/analysis/analysis_context.h>
+#include <volt/structures/cluster_graph.h>
 
 #include <memory>
 #include <vector>
 
-namespace OpenDXA{
+namespace Volt{
 
 class ElasticStrainEngine{
 public:

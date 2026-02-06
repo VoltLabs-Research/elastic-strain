@@ -1,10 +1,10 @@
-#include <opendxa/analysis/elastic_strain.h>
-#include <opendxa/analysis/cluster_connector.h>
+#include <volt/elastic_strain_engine.h>
+#include <volt/analysis/cluster_connector.h>
 
 #include <cmath>
 #include <cassert>
 
-namespace OpenDXA{
+namespace Volt{
 
 ElasticStrainEngine::ElasticStrainEngine(
     ParticleProperty* positions,

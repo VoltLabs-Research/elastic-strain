@@ -1,19 +1,19 @@
 #pragma once
 
-#include <opendxa/core/opendxa.h>
-#include <opendxa/core/lammps_parser.h>
+#include <volt/core/volt.h>
+#include <volt/core/lammps_parser.h>
 #include <nlohmann/json.hpp>
-#include <opendxa/core/particle_property.h>
-#include <opendxa/structures/crystal_structure_types.h>
-#include <opendxa/analysis/structure_analysis.h>
+#include <volt/core/particle_property.h>
+#include <volt/structures/crystal_structure_types.h>
+#include <volt/analysis/structure_analysis.h>
 #include <string>
 
-namespace OpenDXA{
+namespace Volt{
 using json = nlohmann::json;
     
-class ElasticStrainWrapper{
+class ElasticStrainService{
 public:
-    ElasticStrainWrapper();
+    ElasticStrainService();
 
     void setInputCrystalStructure(LatticeStructureType structure);
     void setIdentificationMode(StructureAnalysis::Mode mode);
@@ -42,9 +42,6 @@ private:
     bool _pushForward;
     bool _calculateDeformationGradient;
     bool _calculateStrainTensors;
-
-
-    std::shared_ptr<Particles::ParticleProperty> createPositionProperty(const LammpsParser::Frame &frame);
 };
 
 }
