@@ -3,6 +3,8 @@
 
 #include <cmath>
 #include <cassert>
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
 
 namespace Volt{
 
@@ -72,9 +74,9 @@ void ElasticStrainEngine::perform(){
 
     const std::size_t N = _context.atomCount();
 
-    #pragma omp parallel for
-    for(long idx = 0; idx < static_cast<long>(N); ++idx){
-        std::size_t particleIndex = static_cast<std::size_t>(idx);
+    tbb::parallel_for(tbb::blocked_range<std::size_t>(0, N),
+        [this](const tbb::blocked_range<std::size_t>& r){
+        for(std::size_t particleIndex = r.begin(); particleIndex < r.end(); ++particleIndex){
 
         Cluster* localCluster = _structureAnalysis.atomCluster(static_cast<int>(particleIndex));
         if(!localCluster || localCluster->id == 0){
@@ -188,7 +190,8 @@ void ElasticStrainEngine::perform(){
             (elasticStrain(0,0) + elasticStrain(1,1) + elasticStrain(2,2)) / 3.0;
         assert(std::isfinite(volumetricStrain));
         _volumetricStrains->setDouble(particleIndex, volumetricStrain);
-    } 
+    }
+    });
 }
 
 }

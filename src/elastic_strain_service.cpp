@@ -52,7 +52,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         return AnalysisResult::failure("Invalid number of atoms");
     }
 
-    auto positions = FrameAdapter::createPositionProperty(frame);
+    auto positions = FrameAdapter::createPositionPropertyShared(frame);
     if(!positions){
         return AnalysisResult::failure("Failed to create position property");
     }
