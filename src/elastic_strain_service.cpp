@@ -3,6 +3,7 @@
 #include <volt/core/frame_adapter.h>
 #include <volt/core/analysis_result.h>
 #include <volt/utilities/concurrence/parallel_system.h>
+#include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
 
 namespace Volt{
@@ -82,8 +83,12 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     AnalysisResult::addTiming(result, startTime);
 
     if(!outputFilename.empty()){
-        // TODO: Implement msgpack export in standalone package
-        spdlog::warn("File output not yet implemented in standalone package");
+        const std::string outputPath = outputFilename + "_elastic_strain.msgpack";
+        if(JsonUtils::writeJsonMsgpackToFile(result, outputPath, false)){
+            spdlog::info("Elastic strain msgpack written to {}", outputPath);
+        }else{
+            spdlog::warn("Could not write elastic strain msgpack: {}", outputPath);
+        }
     }
 
     return result;
