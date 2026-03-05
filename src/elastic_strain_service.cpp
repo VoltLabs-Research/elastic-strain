@@ -49,14 +49,12 @@ void ElasticStrainService::setParameters(
 json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::string &outputFilename){
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    if(frame.natoms <= 0){
+    if(frame.natoms <= 0)
         return AnalysisResult::failure("Invalid number of atoms");
-    }
 
     auto positions = FrameAdapter::createPositionPropertyShared(frame);
-    if(!positions){
+    if(!positions)
         return AnalysisResult::failure("Failed to create position property");
-    }
 
     std::vector<Matrix3> preferredOrientations;
     preferredOrientations.push_back(Matrix3::Identity());
@@ -79,8 +77,43 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
     engine.perform();
 
-    json result = AnalysisResult::success();
-    AnalysisResult::addTiming(result, startTime);
+    auto volumetric = engine.volumetricStrains();
+    auto strainTensor = engine.strainTensors();
+    auto defGrad = engine.deformationGradients();
+
+    const size_t n = static_cast<size_t>(frame.natoms);
+    double totalVolumetric = 0.0;
+    for(size_t i = 0; i < n; i++){
+        if(volumetric) totalVolumetric += volumetric->getDouble(i);
+    }
+
+    json result;
+    result["main_listing"] = {
+        { "average_volumetric_strain", n > 0 ? totalVolumetric / n : 0.0 }
+    };
+
+    json perAtom = json::array();
+    for(size_t i = 0; i < n; i++){
+        json a;
+        a["id"] = frame.ids[i];
+
+        if(volumetric) a["volumetric_strain"] = volumetric->getDouble(i);
+
+        if(strainTensor){
+            json tensor = json::array();
+            for(int c = 0; c < 6; c++) tensor.push_back(strainTensor->getDoubleComponent(i, c));
+            a["strain_tensor"] = tensor;
+        }
+
+        if(defGrad){
+            json grad = json::array();
+            for(int c = 0; c < 9; c++) grad.push_back(defGrad->getDoubleComponent(i, c));
+            a["deformation_gradient"] = grad;
+        }
+
+        perAtom.push_back(a);
+    }
+    result["per-atom-properties"] = perAtom;
 
     if(!outputFilename.empty()){
         const std::string outputPath = outputFilename + "_elastic_strain.msgpack";
@@ -91,6 +124,8 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         }
     }
 
+    spdlog::info("Elastic strain analysis completed.");
     return result;
 }
 }
+
