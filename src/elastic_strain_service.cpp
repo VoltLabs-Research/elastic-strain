@@ -5,6 +5,7 @@
 #include <volt/utilities/concurrence/parallel_system.h>
 #include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
+#include <algorithm>
 
 namespace Volt{
 
@@ -121,6 +122,54 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             spdlog::info("Elastic strain msgpack written to {}", outputPath);
         }else{
             spdlog::warn("Could not write elastic strain msgpack: {}", outputPath);
+        }
+
+        // --- atoms.msgpack export (Structure Identification exposure) ---
+        {
+            const StructureAnalysis& sa = engine.structureAnalysis();
+            constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
+            std::vector<std::string> names(K);
+            for(int st = 0; st < K; st++)
+                names[st] = sa.getStructureTypeName(st);
+
+            std::vector<std::vector<size_t>> structureAtomIndices(K);
+            for(size_t i = 0; i < n; ++i){
+                const int raw = structureTypes->getInt(i);
+                const int st = (0 <= raw && raw < K) ? raw : 0;
+                structureAtomIndices[static_cast<size_t>(st)].push_back(i);
+            }
+
+            std::vector<int> structureOrder;
+            structureOrder.reserve(K);
+            for(int st = 0; st < K; st++){
+                if(!structureAtomIndices[static_cast<size_t>(st)].empty())
+                    structureOrder.push_back(st);
+            }
+            std::sort(structureOrder.begin(), structureOrder.end(),
+                [&](int a, int b){ return names[a] < names[b]; });
+
+            json atomsByStructure;
+            for(int st : structureOrder){
+                json atomsArray = json::array();
+                for(size_t atomIndex : structureAtomIndices[static_cast<size_t>(st)]){
+                    const Point3& pos = frame.positions[atomIndex];
+                    atomsArray.push_back({
+                        {"id", frame.ids[atomIndex]},
+                        {"pos", {pos.x(), pos.y(), pos.z()}}
+                    });
+                }
+                atomsByStructure[names[st]] = atomsArray;
+            }
+
+            json exportWrapper;
+            exportWrapper["export"] = json::object();
+            exportWrapper["export"]["AtomisticExporter"] = atomsByStructure;
+            const std::string atomsPath = outputFilename + "_atoms.msgpack";
+            if(JsonUtils::writeJsonMsgpackToFile(exportWrapper, atomsPath, false)){
+                spdlog::info("Exported atoms data to: {}", atomsPath);
+            }else{
+                spdlog::warn("Could not write atoms msgpack: {}", atomsPath);
+            }
         }
     }
 
