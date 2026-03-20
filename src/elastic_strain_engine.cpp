@@ -58,7 +58,12 @@ ElasticStrainEngine::ElasticStrainEngine(
 }
 
 void ElasticStrainEngine::perform(){
-    _structureAnalysis.identifyStructures();
+    if(_structureAnalysis.usingPTM()){
+        _structureAnalysis.determineLocalStructuresWithPTM();
+        _structureAnalysis.computeMaximumNeighborDistanceFromPTM();
+    }else{
+        _structureAnalysis.identifyStructuresCNA();
+    }
 
     auto stats = _structureAnalysis.getNamedStructureStatistics();
     spdlog::info("Structure Identification Results:");
