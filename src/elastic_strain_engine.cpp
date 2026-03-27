@@ -1,5 +1,4 @@
 #include <volt/elastic_strain_engine.h>
-#include <volt/analysis/cluster_connector.h>
 
 #include <cmath>
 #include <cassert>
@@ -9,42 +8,30 @@
 namespace Volt{
 
 ElasticStrainEngine::ElasticStrainEngine(
-    ParticleProperty* positions,
-    ParticleProperty* structures,
-    const SimulationCell& simcell,
+    StructureAnalysis& structureAnalysis,
+    StructureContext& context,
     LatticeStructureType inputCrystalStructure,
-    std::vector<Matrix3>&& preferredCrystalOrientations,
     bool calculateDeformationGradients,
     bool calculateStrainTensors,
     double latticeConstant,
     double caRatio,
-    bool pushStrainTensorsForward,
-    StructureAnalysis::Mode identificationMode,
-    double rmsd
+    bool pushStrainTensorsForward
 )
     : _latticeConstant(latticeConstant)
     , _axialScaling(1.0)
     , _inputCrystalStructure(inputCrystalStructure)
     , _pushStrainTensorsForward(pushStrainTensorsForward)
-    , _context(positions,
-               simcell,
-               inputCrystalStructure,
-               /*selection*/ nullptr,
-               /*outputStructures*/ structures,
-               std::move(preferredCrystalOrientations))
-    , _structureAnalysis(_context,
-                         /*identifyPlanarDefects*/ false,
-                         identificationMode,
-                         rmsd)
+    , _context(context)
+    , _structureAnalysis(structureAnalysis)
     , _volumetricStrains(std::make_unique<ParticleProperty>(
-          positions->size(), DataType::Double, 1, 0, false))
+          context.atomCount(), DataType::Double, 1, 0, false))
     , _strainTensors(calculateStrainTensors
           ? std::make_unique<ParticleProperty>(
-                positions->size(), DataType::Double, 6, 0, false)
+                context.atomCount(), DataType::Double, 6, 0, false)
           : nullptr)
     , _deformationGradients(calculateDeformationGradients
           ? std::make_unique<ParticleProperty>(
-                positions->size(), DataType::Double, 9, 0, false)
+                context.atomCount(), DataType::Double, 9, 0, false)
           : nullptr)
 {
     if(inputCrystalStructure == LatticeStructureType::LATTICE_FCC ||
@@ -58,25 +45,6 @@ ElasticStrainEngine::ElasticStrainEngine(
 }
 
 void ElasticStrainEngine::perform(){
-    if(_structureAnalysis.usingPTM()){
-        _structureAnalysis.determineLocalStructuresWithPTM();
-        _structureAnalysis.computeMaximumNeighborDistanceFromPTM();
-    }else{
-        _structureAnalysis.identifyStructuresCNA();
-    }
-
-    auto stats = _structureAnalysis.getNamedStructureStatistics();
-    spdlog::info("Structure Identification Results:");
-    for(const auto& [name, count] : stats){
-        spdlog::info("  {}: {}", name, count);
-    }
-    spdlog::info("Input Crystal Structure (Expected): {}", static_cast<int>(_inputCrystalStructure));
-
-    ClusterConnector clusterConnector(_structureAnalysis, _context);
-    clusterConnector.buildClusters();
-    clusterConnector.connectClusters();
-    clusterConnector.formSuperClusters();
-
     const std::size_t N = _context.atomCount();
 
     tbb::parallel_for(tbb::blocked_range<std::size_t>(0, N),
@@ -105,12 +73,16 @@ void ElasticStrainEngine::perform(){
             0.0,              0.0,            _latticeConstant * _axialScaling
         );
 
-        Cluster* parentCluster = nullptr;
-        if(localCluster->parentTransition != nullptr){
-            parentCluster = localCluster->parentTransition->cluster2;
-            idealUnitCellTM = idealUnitCellTM * localCluster->parentTransition->tm;
-        }else if(localCluster->structure == _inputCrystalStructure){
-            parentCluster = localCluster;
+        Cluster* parentCluster = localCluster;
+        ClusterTransition* parentTransition = localCluster->parentTransition;
+        while(parentTransition != nullptr){
+            idealUnitCellTM = idealUnitCellTM * parentTransition->tm;
+            parentCluster = parentTransition->cluster2;
+            parentTransition = parentCluster ? parentCluster->parentTransition : nullptr;
+        }
+
+        if(parentCluster == localCluster && localCluster->structure != _inputCrystalStructure){
+            parentCluster = nullptr;
         }
 
         if(!parentCluster){
@@ -128,9 +100,21 @@ void ElasticStrainEngine::perform(){
             continue;
         }
 
-        assert(parentCluster->structure == _inputCrystalStructure);
+        if(parentCluster->structure != _inputCrystalStructure){
+            _volumetricStrains->setDouble(particleIndex, 0.0);
+            if(_strainTensors){
+                for(size_t c = 0; c < 6; ++c){
+                    _strainTensors->setDoubleComponent(particleIndex, c, 0.0);
+                }
+            }
+            if(_deformationGradients){
+                for(size_t c = 0; c < 9; ++c){
+                    _deformationGradients->setDoubleComponent(particleIndex, c, 0.0);
+                }
+            }
+            continue;
+        }
 
-        // TODO: PTM already provides this information. We should use it if it is available.
         Matrix_3<double> orientationV = Matrix_3<double>::Zero();
         Matrix_3<double> orientationW = Matrix_3<double>::Zero();
 
@@ -166,13 +150,10 @@ void ElasticStrainEngine::perform(){
             }
         }
 
-        // Strain tensor
         SymmetricTensor2T<double> elasticStrain;
         if(!_pushStrainTensorsForward){
-            // Green strain (material frame)
             elasticStrain = (Product_AtA(elasticF) - SymmetricTensor2T<double>::Identity()) * 0.5;
         }else{
-            // Euler strain (spatial frame)
             Matrix_3<double> inverseF;
             if(!elasticF.inverse(inverseF)){
                 _volumetricStrains->setDouble(particleIndex, 0.0);
@@ -190,7 +171,6 @@ void ElasticStrainEngine::perform(){
             _strainTensors->setSymmetricTensor2(particleIndex, (SymmetricTensor2)elasticStrain);
         }
 
-        // Volumetric strain = tr(ε)/3
         double volumetricStrain =
             (elasticStrain(0,0) + elasticStrain(1,1) + elasticStrain(2,2)) / 3.0;
         assert(std::isfinite(volumetricStrain));

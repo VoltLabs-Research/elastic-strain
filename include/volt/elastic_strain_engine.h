@@ -3,29 +3,22 @@
 #include <volt/analysis/structure_analysis.h>
 #include <volt/core/particle_property.h>
 #include <volt/core/simulation_cell.h>
-#include <volt/analysis/analysis_context.h>
-#include <volt/structures/cluster_graph.h>
 
 #include <memory>
-#include <vector>
 
 namespace Volt{
 
 class ElasticStrainEngine{
 public:
     ElasticStrainEngine(
-        ParticleProperty* positions,
-        ParticleProperty* structures,
-        const SimulationCell& simcell,
+        StructureAnalysis& structureAnalysis,
+        StructureContext& context,
         LatticeStructureType inputCrystalStructure,
-        std::vector<Matrix3>&& preferredCrystalOrientations,
         bool calculateDeformationGradients,
         bool calculateStrainTensors,
         double latticeConstant,
         double caRatio,
-        bool pushStrainTensorsForward,
-        StructureAnalysis::Mode identificationMode = StructureAnalysis::Mode::PTM,
-        double rmsd = 0.12
+        bool pushStrainTensorsForward
     );
 
     void perform();
@@ -36,10 +29,6 @@ public:
     }
 
     // Returns the created cluster graph
-    ClusterGraph* clusterGraph(){
-        return &_structureAnalysis.clusterGraph();
-    }
-
     const StructureAnalysis& structureAnalysis() const{
         return _structureAnalysis;
     }
@@ -65,8 +54,8 @@ private:
     LatticeStructureType _inputCrystalStructure;
     bool _pushStrainTensorsForward;
 
-    AnalysisContext   _context;  
-    StructureAnalysis _structureAnalysis;
+    StructureContext& _context;
+    StructureAnalysis& _structureAnalysis;
 
     std::unique_ptr<ParticleProperty> _volumetricStrains;
     std::unique_ptr<ParticleProperty> _strainTensors;

@@ -1,20 +1,69 @@
 #include <volt/elastic_strain_service.h>
 #include <volt/elastic_strain_engine.h>
+#include <volt/core/reconstructed_structure.h>
 #include <volt/core/frame_adapter.h>
 #include <volt/core/analysis_result.h>
-#include <volt/utilities/concurrence/parallel_system.h>
+#include <volt/analysis/cluster_graph_export.h>
+#include <volt/analysis/structure_analysis.h>
 #include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <utility>
 
 namespace Volt{
 
 using namespace Volt::Particles;
 
+namespace {
+
+std::string structureTypeNameForExport(int structureType){
+    switch(static_cast<StructureType>(structureType)){
+        case StructureType::SC:
+            return "SC";
+        case StructureType::FCC:
+            return "FCC";
+        case StructureType::HCP:
+            return "HCP";
+        case StructureType::BCC:
+            return "BCC";
+        case StructureType::CUBIC_DIAMOND:
+            return "CUBIC_DIAMOND";
+        case StructureType::HEX_DIAMOND:
+            return "HEX_DIAMOND";
+        case StructureType::ICO:
+            return "ICO";
+        case StructureType::GRAPHENE:
+            return "GRAPHENE";
+        case StructureType::CUBIC_DIAMOND_FIRST_NEIGH:
+            return "CUBIC_DIAMOND_FIRST_NEIGH";
+        case StructureType::CUBIC_DIAMOND_SECOND_NEIGH:
+            return "CUBIC_DIAMOND_SECOND_NEIGH";
+        case StructureType::HEX_DIAMOND_FIRST_NEIGH:
+            return "HEX_DIAMOND_FIRST_NEIGH";
+        case StructureType::HEX_DIAMOND_SECOND_NEIGH:
+            return "HEX_DIAMOND_SECOND_NEIGH";
+        case StructureType::OTHER:
+        case StructureType::NUM_STRUCTURE_TYPES:
+        default:
+            return "OTHER";
+    }
+}
+
+std::vector<int> buildAtomStructureTypes(const StructureAnalysis& analysis, std::size_t atomCount){
+    std::vector<int> structureTypes(atomCount, static_cast<int>(StructureType::OTHER));
+    for(std::size_t atomIndex = 0; atomIndex < atomCount; ++atomIndex){
+        Cluster* cluster = analysis.atomCluster(static_cast<int>(atomIndex));
+        if(cluster){
+            structureTypes[atomIndex] = cluster->structure;
+        }
+    }
+    return structureTypes;
+}
+
+}
+
 ElasticStrainService::ElasticStrainService()
     : _inputCrystalStructure(LATTICE_BCC),
-      _identificationMode(StructureAnalysis::Mode::PTM),
-      _rmsd(0.10f),
       _latticeConstant(1.63f),
       _caRatio(1.0),
       _pushForward(false),
@@ -25,12 +74,12 @@ void ElasticStrainService::setInputCrystalStructure(LatticeStructureType structu
     _inputCrystalStructure = structure;
 }
 
-void ElasticStrainService::setIdentificationMode(StructureAnalysis::Mode mode){
-    _identificationMode = mode;
+void ElasticStrainService::setClustersTablePath(std::string path){
+    _clustersTablePath = std::move(path);
 }
 
-void ElasticStrainService::setRMSD(float rmsd){
-    _rmsd = rmsd;
+void ElasticStrainService::setClusterTransitionsPath(std::string path){
+    _clusterTransitionsPath = std::move(path);
 }
 
 void ElasticStrainService::setParameters(
@@ -50,30 +99,44 @@ void ElasticStrainService::setParameters(
 json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::string &outputFilename){
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    if(frame.natoms <= 0)
-        return AnalysisResult::failure("Invalid number of atoms");
+    if(_clustersTablePath.empty() || _clusterTransitionsPath.empty()){
+        return AnalysisResult::failure(
+            "ElasticStrain requires --clusters-table and --clusters-transitions"
+        );
+    }
 
-    auto positions = FrameAdapter::createPositionPropertyShared(frame);
-    if(!positions)
-        return AnalysisResult::failure("Failed to create position property");
+    FrameAdapter::PreparedAnalysisInput prepared;
+    std::string frameError;
+    if(!FrameAdapter::prepareAnalysisInput(frame, prepared, &frameError))
+        return AnalysisResult::failure(frameError);
 
-    std::vector<Matrix3> preferredOrientations;
-    preferredOrientations.push_back(Matrix3::Identity());
+    auto positions = std::move(prepared.positions);
 
-    auto structureTypes = std::make_shared<ParticleProperty>(frame.natoms, DataType::Int, 1, 0, true);
+    ReconstructedStructureContext context(positions.get(), frame.simulationCell);
+    context.inputCrystalType = _inputCrystalStructure;
+
+    StructureAnalysis analysis(context);
+    std::string reconstructionError;
+    if(!ReconstructedStructureLoader::load(
+        frame,
+        {_clustersTablePath, _clusterTransitionsPath},
+        analysis,
+        context,
+        &reconstructionError
+    )){
+        return AnalysisResult::failure(reconstructionError);
+    }
+    rebuildImportedClusterParentHierarchy(analysis);
+
     ElasticStrainEngine engine(
-        positions.get(),
-        structureTypes.get(),
-        frame.simulationCell,
+        analysis,
+        context,
         static_cast<LatticeStructureType>(_inputCrystalStructure),
-        std::move(preferredOrientations),
         _calculateDeformationGradient,
         _calculateStrainTensors,
         _latticeConstant,
         _caRatio,
-        _pushForward,
-        _identificationMode,
-        _rmsd
+        _pushForward
     );
 
     engine.perform();
@@ -83,6 +146,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     auto defGrad = engine.deformationGradients();
 
     const size_t n = static_cast<size_t>(frame.natoms);
+    const std::vector<int> atomStructureTypes = buildAtomStructureTypes(analysis, n);
     double totalVolumetric = 0.0;
     for(size_t i = 0; i < n; i++){
         if(volumetric) totalVolumetric += volumetric->getDouble(i);
@@ -126,16 +190,15 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
         // --- atoms.msgpack export (Structure Identification exposure) ---
         {
-            const StructureAnalysis& sa = engine.structureAnalysis();
             constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
             std::vector<std::string> names(K);
             for(int st = 0; st < K; st++)
-                names[st] = sa.getStructureTypeName(st);
+                names[st] = structureTypeNameForExport(st);
 
             std::vector<std::vector<size_t>> structureAtomIndices(K);
             for(size_t i = 0; i < n; ++i){
-                const int raw = structureTypes->getInt(i);
-                const int st = (0 <= raw && raw < K) ? raw : 0;
+                const int raw = atomStructureTypes[i];
+                const int st = (0 <= raw && raw < K) ? raw : static_cast<int>(StructureType::OTHER);
                 structureAtomIndices[static_cast<size_t>(st)].push_back(i);
             }
 
@@ -177,4 +240,3 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     return result;
 }
 }
-

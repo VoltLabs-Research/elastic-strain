@@ -32,10 +32,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release MinSizeRel RelWithDebInfo)
 
+set(VOLTLABS_ROOT "${CMAKE_SOURCE_DIR}/.." CACHE PATH "Path to the local VoltLabs workspace")
+set(CORETOOLKIT_SOURCE_DIR "${VOLTLABS_ROOT}/CoreToolkit" CACHE PATH "Local CoreToolkit source directory")
+set(STRUCTURE_IDENTIFICATION_SOURCE_DIR "${VOLTLABS_ROOT}/StructureIdentification" CACHE PATH "Local StructureIdentification source directory")
+set(CORETOOLKIT_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/_deps/install/coretoolkit" CACHE PATH "Install prefix for local CoreToolkit bootstrap")
+set(STRUCTURE_IDENTIFICATION_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/_deps/install/structure-identification" CACHE PATH "Install prefix for local StructureIdentification bootstrap")
+
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 find_package(coretoolkit REQUIRED)
 find_package(structure-identification REQUIRED)
-find_package(common-neighbor-analysis REQUIRED)
-find_package(polyhedral-template-matching REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
@@ -63,27 +69,15 @@ add_library(${PROJECT_NAME}_lib STATIC ${LIB_SOURCES})
 set_target_properties(${PROJECT_NAME}_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 get_target_property(STRUCTURE_IDENTIFICATION_INCLUDE_DIRS structure-identification::structure-identification INTERFACE_INCLUDE_DIRECTORIES)
-get_target_property(COMMON_NEIGHBOR_ANALYSIS_INCLUDE_DIRS common-neighbor-analysis::common-neighbor-analysis INTERFACE_INCLUDE_DIRECTORIES)
-get_target_property(POLYHEDRAL_TEMPLATE_MATCHING_INCLUDE_DIRS polyhedral-template-matching::polyhedral-template-matching INTERFACE_INCLUDE_DIRECTORIES)
 
 set(LOCAL_STRUCTURE_IDENTIFICATION_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../StructureIdentification/include")
-set(LOCAL_COMMON_NEIGHBOR_ANALYSIS_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../CommonNeighborAnalysis/include")
-set(LOCAL_POLYHEDRAL_TEMPLATE_MATCHING_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../PolyhedralTemplateMatching/include")
 
 if(EXISTS "${LOCAL_STRUCTURE_IDENTIFICATION_INCLUDE_DIR}")
 	list(PREPEND STRUCTURE_IDENTIFICATION_INCLUDE_DIRS "${LOCAL_STRUCTURE_IDENTIFICATION_INCLUDE_DIR}")
 endif()
-if(EXISTS "${LOCAL_COMMON_NEIGHBOR_ANALYSIS_INCLUDE_DIR}")
-	list(PREPEND COMMON_NEIGHBOR_ANALYSIS_INCLUDE_DIRS "${LOCAL_COMMON_NEIGHBOR_ANALYSIS_INCLUDE_DIR}")
-endif()
-if(EXISTS "${LOCAL_POLYHEDRAL_TEMPLATE_MATCHING_INCLUDE_DIR}")
-	list(PREPEND POLYHEDRAL_TEMPLATE_MATCHING_INCLUDE_DIRS "${LOCAL_POLYHEDRAL_TEMPLATE_MATCHING_INCLUDE_DIR}")
-endif()
 
 target_include_directories(${PROJECT_NAME}_lib BEFORE PUBLIC
 	${STRUCTURE_IDENTIFICATION_INCLUDE_DIRS}
-	${COMMON_NEIGHBOR_ANALYSIS_INCLUDE_DIRS}
-	${POLYHEDRAL_TEMPLATE_MATCHING_INCLUDE_DIRS}
 	${CMAKE_SOURCE_DIR}/include
 )
 target_precompile_headers(${PROJECT_NAME}_lib PRIVATE <volt/core/volt.h>)
@@ -91,8 +85,6 @@ target_link_libraries(${PROJECT_NAME}_lib PUBLIC
 	${ELASTIC_STRAIN_BOOST_TARGET}
 	TBB::tbb
 	structure-identification::structure-identification
-	common-neighbor-analysis::common-neighbor-analysis
-	polyhedral-template-matching::polyhedral-template-matching
 	coretoolkit::coretoolkit
 	spdlog::spdlog
 	nlohmann_json::nlohmann_json

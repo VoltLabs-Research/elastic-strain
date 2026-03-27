@@ -5,7 +5,6 @@
 #include <nlohmann/json.hpp>
 #include <volt/core/particle_property.h>
 #include <volt/structures/crystal_structure_types.h>
-#include <volt/analysis/structure_analysis.h>
 #include <string>
 
 namespace Volt{
@@ -16,8 +15,8 @@ public:
     ElasticStrainService();
 
     void setInputCrystalStructure(LatticeStructureType structure);
-    void setIdentificationMode(StructureAnalysis::Mode mode);
-    void setRMSD(float rmsd);
+    void setClustersTablePath(std::string path);
+    void setClusterTransitionsPath(std::string path);
 
     void setParameters(
         double latticeConstant,
@@ -34,8 +33,8 @@ public:
 
 private:
     LatticeStructureType _inputCrystalStructure;
-    StructureAnalysis::Mode _identificationMode;
-    float _rmsd;
+    std::string _clustersTablePath;
+    std::string _clusterTransitionsPath;
 
     double _latticeConstant;
     double _caRatio;
