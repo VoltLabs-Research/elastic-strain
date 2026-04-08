@@ -34,9 +34,9 @@ ElasticStrainEngine::ElasticStrainEngine(
                 context.atomCount(), DataType::Double, 9, 0, false)
           : nullptr)
 {
-    if(inputCrystalStructure == LatticeStructureType::LATTICE_FCC ||
-       inputCrystalStructure == LatticeStructureType::LATTICE_BCC ||
-       inputCrystalStructure == LatticeStructureType::LATTICE_CUBIC_DIAMOND){
+    if(inputCrystalStructure == LATTICE_FCC ||
+       inputCrystalStructure == LATTICE_BCC ||
+       inputCrystalStructure == LATTICE_CUBIC_DIAMOND){
         _axialScaling = 1.0;
     }else{
         _latticeConstant *= std::sqrt(2.0);

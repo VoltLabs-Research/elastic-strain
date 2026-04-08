@@ -3,7 +3,7 @@
 #include <volt/core/reconstructed_structure.h>
 #include <volt/core/frame_adapter.h>
 #include <volt/core/analysis_result.h>
-#include <volt/analysis/cluster_graph_export.h>
+#include <volt/analysis/cluster_graph_io.h>
 #include <volt/analysis/structure_analysis.h>
 #include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
