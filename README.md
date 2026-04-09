@@ -2,6 +2,12 @@
 
 `ElasticStrain` reconstructs elastic strain fields from an upstream crystal-state package.
 
+## One-Command Install
+
+```bash
+curl -sSL https://raw.githubusercontent.com/VoltLabs-Research/CoreToolkit/main/scripts/install-plugin.sh | bash -s -- ElasticStrain
+```
+
 ## CLI
 
 Usage:
@@ -26,16 +32,3 @@ elastic-strain <lammps_file> [output_base] [options]
 | `--calcStrainTensors` | No | Compute strain tensors. | `true` |
 | `--threads <int>` | No | Maximum worker threads. | auto capped to physical cores |
 | `--help` | No | Print CLI help. | |
-
-## Build With CoreToolkit
-
-```bash
-cd /path/to/voltlabs-ecosystem/tools/CoreToolkit
-conan create . -nr
-
-cd /path/to/voltlabs-ecosystem/plugins/StructureIdentification
-conan create . -nr
-
-cd /path/to/voltlabs-ecosystem/plugins/ElasticStrain
-conan create . -nr
-```
