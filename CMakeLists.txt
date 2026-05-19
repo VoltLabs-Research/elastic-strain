@@ -32,14 +32,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release MinSizeRel RelWithDebInfo)
 
-set(VOLTLABS_ROOT "${CMAKE_SOURCE_DIR}/.." CACHE PATH "Path to the local VoltLabs workspace")
-set(CORETOOLKIT_SOURCE_DIR "${VOLTLABS_ROOT}/CoreToolkit" CACHE PATH "Local CoreToolkit source directory")
-set(STRUCTURE_IDENTIFICATION_SOURCE_DIR "${VOLTLABS_ROOT}/StructureIdentification" CACHE PATH "Local StructureIdentification source directory")
-set(CORETOOLKIT_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/_deps/install/coretoolkit" CACHE PATH "Install prefix for local CoreToolkit bootstrap")
-set(STRUCTURE_IDENTIFICATION_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/_deps/install/structure-identification" CACHE PATH "Install prefix for local StructureIdentification bootstrap")
-
-list(PREPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
 find_package(coretoolkit REQUIRED)
 find_package(structure-identification REQUIRED)
 find_package(TBB REQUIRED)
@@ -60,26 +52,13 @@ else()
 	message(FATAL_ERROR "ElasticStrain requires a Boost headers target")
 endif()
 
-# Collect all library sources (exclude main.cpp)
 file(GLOB LIB_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cpp)
 list(FILTER LIB_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
 
-# Create static library with algorithm implementation
 add_library(${PROJECT_NAME}_lib STATIC ${LIB_SOURCES})
 set_target_properties(${PROJECT_NAME}_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-get_target_property(STRUCTURE_IDENTIFICATION_INCLUDE_DIRS structure-identification::structure-identification INTERFACE_INCLUDE_DIRECTORIES)
-
-set(LOCAL_STRUCTURE_IDENTIFICATION_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../StructureIdentification/include")
-
-if(EXISTS "${LOCAL_STRUCTURE_IDENTIFICATION_INCLUDE_DIR}")
-	list(PREPEND STRUCTURE_IDENTIFICATION_INCLUDE_DIRS "${LOCAL_STRUCTURE_IDENTIFICATION_INCLUDE_DIR}")
-endif()
-
-target_include_directories(${PROJECT_NAME}_lib BEFORE PUBLIC
-	${STRUCTURE_IDENTIFICATION_INCLUDE_DIRS}
-	${CMAKE_SOURCE_DIR}/include
-)
+target_include_directories(${PROJECT_NAME}_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_precompile_headers(${PROJECT_NAME}_lib PRIVATE <volt/core/volt.h>)
 target_link_libraries(${PROJECT_NAME}_lib PUBLIC
 	${ELASTIC_STRAIN_BOOST_TARGET}
@@ -90,7 +69,6 @@ target_link_libraries(${PROJECT_NAME}_lib PUBLIC
 	nlohmann_json::nlohmann_json
 )
 
-# Create executable
 add_executable(${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/src/main.cpp)
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_precompile_headers(${PROJECT_NAME} PRIVATE <volt/core/volt.h>)
@@ -98,7 +76,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 	TBB::tbb
 	${PROJECT_NAME}_lib
 )
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 install(TARGETS ${PROJECT_NAME}_lib DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)

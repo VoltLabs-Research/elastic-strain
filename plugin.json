@@ -1,0 +1,289 @@
+{
+  "workflow": {
+    "nodes": [
+      {
+        "id": "plugin-metadata",
+        "type": "modifier",
+        "position": {
+          "x": 240,
+          "y": 160
+        },
+        "data": {
+          "modifier": {
+            "name": "Elastic Strain",
+            "key": "elastic-strain",
+            "icon": "HiCube",
+            "author": "Rodolfo Herrera",
+            "license": "MIT",
+            "version": "1.0.0",
+            "homepage": "https://github.com/rodyherrera/Volterra",
+            "description": "Calcula el tensor de deformacion elastica por atomo dado un tipo de estructura cristalina y constante de red."
+          }
+        }
+      },
+      {
+        "id": "plugin-arguments",
+        "type": "arguments",
+        "position": {
+          "x": 528,
+          "y": 208
+        },
+        "data": {
+          "arguments": {
+            "arguments": [
+              {
+                "argument": "structureAnalysisPlugin",
+                "type": "pluginReference",
+                "label": "Structure Analysis Algorithm",
+                "required": true,
+                "showPluginConfiguration": true,
+                "pluginReferenceFilterKeys": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis"
+                ]
+              },
+              {
+                "argument": "latticeConstant",
+                "type": "number",
+                "label": "Lattice Constant",
+                "default": 3.615,
+                "min": 0,
+                "step": 0.01
+              },
+              {
+                "argument": "crystalStructure",
+                "type": "select",
+                "label": "Crystal Structure",
+                "default": "FCC",
+                "options": [
+                  {
+                    "key": "FCC",
+                    "label": "FCC"
+                  },
+                  {
+                    "key": "BCC",
+                    "label": "BCC"
+                  },
+                  {
+                    "key": "HCP",
+                    "label": "HCP"
+                  }
+                ]
+              },
+              {
+                "argument": "caRatio",
+                "type": "number",
+                "label": "c/a Ratio",
+                "default": 1,
+                "min": 0,
+                "step": 0.01
+              },
+              {
+                "argument": "pushForward",
+                "type": "boolean",
+                "label": "Push Forward",
+                "default": false
+              },
+              {
+                "argument": "calcDeformationGradient",
+                "type": "boolean",
+                "label": "Calc Deformation Gradient",
+                "default": true
+              },
+              {
+                "argument": "calcStrainTensors",
+                "type": "boolean",
+                "label": "Calc Strain Tensors",
+                "default": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "trajectory-context",
+        "type": "context",
+        "position": {
+          "x": 816,
+          "y": 160
+        },
+        "data": {
+          "context": {
+            "source": "trajectory_dumps"
+          }
+        }
+      },
+      {
+        "id": "foreach-trajectory-dumps",
+        "type": "forEach",
+        "position": {
+          "x": 1088,
+          "y": 208
+        },
+        "data": {
+          "forEach": {
+            "iterableSource": "{{ trajectory-context.trajectory_dumps }}"
+          }
+        }
+      },
+      {
+        "id": "analysis-entrypoint",
+        "type": "entrypoint",
+        "position": {
+          "x": 1696,
+          "y": 208
+        },
+        "data": {
+          "entrypoint": {
+            "type": "python-script",
+            "binary": "elastic-strain-plugin.zip",
+            "binaryObjectPath": "__UPLOAD_BINARY_OBJECT_PATH__",
+            "binaryFileName": "elastic-strain-plugin.zip",
+            "entrypointScript": "scripts/elastic_strain_plugin_wrapper.py",
+            "requirementsFile": "",
+            "arguments": "{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}",
+            "timeout": -1,
+            "inputs": [
+              {
+                "name": "annotatedDump",
+                "required": true,
+                "description": "Per-atom annotated LAMMPS dump produced by an upstream structure-identification step."
+              },
+              {
+                "name": "clustersTable",
+                "required": true,
+                "cliFlag": "--clusters-table",
+                "description": "Cluster graph table produced by an upstream structure-identification step."
+              },
+              {
+                "name": "clustersTransitions",
+                "required": true,
+                "cliFlag": "--clusters-transitions",
+                "description": "Cluster transitions table produced by an upstream structure-identification step."
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "primary-exposure",
+        "type": "exposure",
+        "position": {
+          "x": 2016,
+          "y": 208
+        },
+        "data": {
+          "exposure": {
+            "name": "Elastic Strain",
+            "icon": "HiCube",
+            "results": "elastic_strain.msgpack",
+            "iterable": ""
+          }
+        }
+      },
+      {
+        "id": "structure-analysis-plugin",
+        "type": "plugin-node",
+        "position": {
+          "x": 1392,
+          "y": 208
+        },
+        "data": {
+          "pluginNode": {
+            "executionMode": "argumentReference",
+            "argumentReference": "structureAnalysisPlugin",
+            "outputPathMode": "parent"
+          }
+        }
+      },
+      {
+        "id": "elastic-strain-model-exposure",
+        "type": "exposure",
+        "position": {
+          "x": 2016,
+          "y": 344
+        },
+        "data": {
+          "exposure": {
+            "name": "Elastic Strain Model",
+            "icon": "HiCube",
+            "results": "atoms.msgpack",
+            "iterable": ""
+          }
+        }
+      },
+      {
+        "id": "elastic-strain-model-export",
+        "type": "export",
+        "position": {
+          "x": 2336,
+          "y": 344
+        },
+        "data": {
+          "export": {
+            "exporter": "AtomisticExporter",
+            "type": "glb"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-metadata-arguments",
+        "source": "plugin-metadata",
+        "sourceHandle": "output",
+        "target": "plugin-arguments",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-arguments-context",
+        "source": "plugin-arguments",
+        "sourceHandle": "output",
+        "target": "trajectory-context",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-context-foreach",
+        "source": "trajectory-context",
+        "sourceHandle": "output",
+        "target": "foreach-trajectory-dumps",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-entrypoint-exposure",
+        "source": "analysis-entrypoint",
+        "sourceHandle": "output",
+        "target": "primary-exposure",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-foreach-structure-analysis",
+        "source": "foreach-trajectory-dumps",
+        "sourceHandle": "output",
+        "target": "structure-analysis-plugin",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-structure-analysis-entrypoint",
+        "source": "structure-analysis-plugin",
+        "sourceHandle": "output",
+        "target": "analysis-entrypoint",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-entrypoint-elastic-strain-model-exposure",
+        "source": "analysis-entrypoint",
+        "sourceHandle": "output",
+        "target": "elastic-strain-model-exposure",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-elastic-strain-model-exposure-elastic-strain-model-export",
+        "source": "elastic-strain-model-exposure",
+        "sourceHandle": "output",
+        "target": "elastic-strain-model-export",
+        "targetHandle": "input"
+      }
+    ]
+  }
+}

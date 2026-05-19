@@ -1,6 +1,7 @@
 #include <volt/cli/common.h>
 #include <volt/elastic_strain_service.h>
 #include <volt/structures/crystal_structure_types.h>
+#include <volt/structures/crystal_topology_registry.h>
 #include <oneapi/tbb/global_control.h>
 #include <tbb/info.h>
 
@@ -28,6 +29,7 @@ void showUsage(const std::string& name) {
         << "  --clusters-table <path>       Path to *_clusters.table exported upstream.\n"
         << "  --clusters-transitions <path> Path to *_cluster_transitions.table exported upstream.\n"
         << "  --crystalStructure <type>     Crystal structure. (BCC|FCC|HCP|...) [default: BCC]\n"
+        << "  --lattice-dir <path>          Directory containing lattice topology YAMLs.\n"
         << "  --latticeConstant <float>     Lattice constant a₀. [required]\n"
         << "  --caRatio <float>             c/a ratio for HCP/hex crystals. [default: 1.0]\n"
         << "  --pushForward                 Push to spatial frame (Euler strain). [default: false]\n"
@@ -105,6 +107,12 @@ int main(int argc, char* argv[]){
     );
     initLogging("volt-elastic-strain");
     spdlog::info("Using {} threads (OneTBB)", requestedThreads);
+
+    const std::string latticeDirectory = getString(opts, "--lattice-dir", "");
+    if(!latticeDirectory.empty()){
+        setCrystalTopologySearchRoot(latticeDirectory);
+        spdlog::info("Using lattice directory: {}", latticeDirectory);
+    }
 
     LammpsParser::Frame frame;
     if(!parseFrame(filename, frame)) return 1;

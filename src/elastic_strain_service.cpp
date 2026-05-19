@@ -189,6 +189,12 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         }
 
         // --- atoms.msgpack export (Structure Identification exposure) ---
+        // Canonical per-atom envelope + the strain quantities the engine
+        // just computed (volumetric strain, 6-component symmetric strain
+        // tensor, 9-component elastic deformation gradient). Matches
+        // OVITO's ElasticStrainModifier output (StructureTypeProperty,
+        // ClusterProperty, ElasticStrainTensorProperty,
+        // ElasticDeformationGradientProperty).
         {
             constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
             std::vector<std::string> names(K);
@@ -211,20 +217,66 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             std::sort(structureOrder.begin(), structureOrder.end(),
                 [&](int a, int b){ return names[a] < names[b]; });
 
+            int clusteredAtoms = 0;
+            for(size_t i = 0; i < n; ++i){
+                Cluster* cluster = analysis.atomCluster(static_cast<int>(i));
+                if(cluster && cluster->id != 0) ++clusteredAtoms;
+            }
+
+            json structuresListing = json::array();
             json atomsByStructure;
             for(int st : structureOrder){
                 json atomsArray = json::array();
                 for(size_t atomIndex : structureAtomIndices[static_cast<size_t>(st)]){
                     const Point3& pos = frame.positions[atomIndex];
-                    atomsArray.push_back({
+                    Cluster* cluster = analysis.atomCluster(static_cast<int>(atomIndex));
+                    const int clusterId = cluster ? cluster->id : 0;
+                    json atom = {
                         {"id", frame.ids[atomIndex]},
-                        {"pos", {pos.x(), pos.y(), pos.z()}}
-                    });
+                        {"pos", {pos.x(), pos.y(), pos.z()}},
+                        {"structure_id", st},
+                        {"structure_type", st},
+                        {"structure_name", names[st]},
+                        {"cluster_id", clusterId}
+                    };
+                    if(cluster && !cluster->topologyName.empty()){
+                        atom["topology_name"] = cluster->topologyName;
+                    }
+                    if(volumetric){
+                        atom["volumetric_strain"] = volumetric->getDouble(atomIndex);
+                    }
+                    if(strainTensor){
+                        json tensor = json::array();
+                        for(int c = 0; c < 6; c++)
+                            tensor.push_back(strainTensor->getDoubleComponent(atomIndex, c));
+                        atom["strain_tensor"] = tensor;
+                    }
+                    if(defGrad){
+                        json grad = json::array();
+                        for(int c = 0; c < 9; c++)
+                            grad.push_back(defGrad->getDoubleComponent(atomIndex, c));
+                        atom["deformation_gradient"] = grad;
+                    }
+                    atomsArray.push_back(std::move(atom));
                 }
                 atomsByStructure[names[st]] = atomsArray;
+                structuresListing.push_back({
+                    {"structure_id", st},
+                    {"structure_name", names[st]},
+                    {"atom_count", static_cast<int>(structureAtomIndices[static_cast<size_t>(st)].size())}
+                });
             }
 
             json exportWrapper;
+            exportWrapper["main_listing"] = {
+                {"total_atoms", frame.natoms},
+                {"structure_count", static_cast<int>(structureOrder.size())},
+                {"clustered_atoms", clusteredAtoms},
+                {"unclustered_atoms", frame.natoms - clusteredAtoms}
+            };
+            exportWrapper["sub_listings"] = {
+                {"structures", structuresListing}
+            };
             exportWrapper["export"] = json::object();
             exportWrapper["export"]["AtomisticExporter"] = atomsByStructure;
             const std::string atomsPath = outputFilename + "_atoms.msgpack";
