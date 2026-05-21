@@ -26,15 +26,15 @@ LatticeStructureType parseCrystalStructure(const std::string& str) {
 void showUsage(const std::string& name) {
     printUsageHeader(name, "Volt - Elastic Strain Analysis");
     std::cerr
-        << "  --clusters-table <path>       Path to *_clusters.table exported upstream.\n"
-        << "  --clusters-transitions <path> Path to *_cluster_transitions.table exported upstream.\n"
-        << "  --crystalStructure <type>     Crystal structure. (BCC|FCC|HCP|...) [default: BCC]\n"
-        << "  --lattice-dir <path>          Directory containing lattice topology YAMLs.\n"
-        << "  --latticeConstant <float>     Lattice constant a₀. [required]\n"
-        << "  --caRatio <float>             c/a ratio for HCP/hex crystals. [default: 1.0]\n"
-        << "  --pushForward                 Push to spatial frame (Euler strain). [default: false]\n"
-        << "  --calcDeformationGradient     Compute deformation gradient F. [default: true]\n"
-        << "  --calcStrainTensors           Compute strain tensors. [default: true]\n"
+        << "  --clusters_table <path>       Path to *_clusters.table exported upstream.\n"
+        << "  --clusters_transitions <path> Path to *_cluster_transitions.table exported upstream.\n"
+        << "  --crystal_structure <type>     Crystal structure. (BCC|FCC|HCP|...) [default: BCC]\n"
+        << "  --lattice_dir <path>          Directory containing lattice topology YAMLs.\n"
+        << "  --lattice_constant <float>     Lattice constant a₀. [required]\n"
+        << "  --ca_ratio <float>             c/a ratio for HCP/hex crystals. [default: 1.0]\n"
+        << "  --push_forward                 Push to spatial frame (Euler strain). [default: false]\n"
+        << "  --calc_deformation_gradient     Compute deformation gradient F. [default: true]\n"
+        << "  --calc_strain_tensors           Compute strain tensors. [default: true]\n"
         << "  --threads <int>               Max worker threads (TBB/OMP). [default: auto]\n";
     printHelpOption();
 }
@@ -53,8 +53,8 @@ int main(int argc, char* argv[]){
         return filename.empty() ? 1 : 0;
     }
 
-    if(!hasOption(opts, "--latticeConstant")){
-        spdlog::error("--latticeConstant is required for elastic strain analysis.");
+    if(!hasOption(opts, "--lattice_constant")){
+        spdlog::error("--lattice_constant is required for elastic strain analysis.");
         showUsage(argv[0]);
         return 1;
     }
@@ -108,7 +108,7 @@ int main(int argc, char* argv[]){
     initLogging("volt-elastic-strain");
     spdlog::info("Using {} threads (OneTBB)", requestedThreads);
 
-    const std::string latticeDirectory = getString(opts, "--lattice-dir", "");
+    const std::string latticeDirectory = getString(opts, "--lattice_dir", "");
     if(!latticeDirectory.empty()){
         setCrystalTopologySearchRoot(latticeDirectory);
         spdlog::info("Using lattice directory: {}", latticeDirectory);
@@ -121,15 +121,15 @@ int main(int argc, char* argv[]){
     spdlog::info("Output base: {}", outputBase);
 
     ElasticStrainService analyzer;
-    analyzer.setClustersTablePath(getString(opts, "--clusters-table"));
-    analyzer.setClusterTransitionsPath(getString(opts, "--clusters-transitions"));
-    analyzer.setInputCrystalStructure(parseCrystalStructure(getString(opts, "--crystalStructure", "BCC")));
+    analyzer.setClustersTablePath(getString(opts, "--clusters_table"));
+    analyzer.setClusterTransitionsPath(getString(opts, "--clusters_transitions"));
+    analyzer.setInputCrystalStructure(parseCrystalStructure(getString(opts, "--crystal_structure", "BCC")));
     analyzer.setParameters(
-        getDouble(opts, "--latticeConstant", 1.63),
-        getDouble(opts, "--caRatio", 1.0),
-        getBool(opts, "--pushForward", false),
-        getBool(opts, "--calcDeformationGradient", true),
-        getBool(opts, "--calcStrainTensors", true)
+        getDouble(opts, "--lattice_constant", 1.63),
+        getDouble(opts, "--ca_ratio", 1.0),
+        getBool(opts, "--push_forward", false),
+        getBool(opts, "--calc_deformation_gradient", true),
+        getBool(opts, "--calc_strain_tensors", true)
     );
 
     spdlog::info("Starting elastic strain analysis...");

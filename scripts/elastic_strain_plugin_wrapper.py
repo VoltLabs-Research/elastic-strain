@@ -143,11 +143,11 @@ def _append_flag_if_missing(args: list[str], flag: str, value: str | None) -> li
 
 
 def _with_default_lattice_dir(args: list[str]) -> list[str]:
-    if _has_flag(args, "--lattice-dir"):
+    if _has_flag(args, "--lattice_dir"):
         return args
     for lattice_dir in LATTICE_DIR_CANDIDATES:
         if lattice_dir.is_dir():
-            return [*args, "--lattice-dir", str(lattice_dir)]
+            return [*args, "--lattice_dir", str(lattice_dir)]
     return args
 
 
@@ -158,8 +158,8 @@ def _with_structure_id_artifacts(
     cluster_transitions: str,
 ) -> list[str]:
     new_args = [annotated_dump, *args[1:]] if args else [annotated_dump]
-    new_args = _append_flag_if_missing(new_args, "--clusters-table", clusters_table)
-    new_args = _append_flag_if_missing(new_args, "--clusters-transitions", cluster_transitions)
+    new_args = _append_flag_if_missing(new_args, "--clusters_table", clusters_table)
+    new_args = _append_flag_if_missing(new_args, "--clusters_transitions", cluster_transitions)
     return new_args
 
 
@@ -181,7 +181,7 @@ def _run_inline_ptm(input_dump: str, scratch_dir: Path) -> tuple[str, str, str]:
     if EMBEDDED_LOADER.exists():
         _ensure_executable(EMBEDDED_LOADER)
     intermediate_base = str(scratch_dir / "structure_id")
-    command = [str(ptm_binary), input_dump, intermediate_base, "--crystalStructure", "FCC", "--rmsd", "0.1"]
+    command = [str(ptm_binary), input_dump, intermediate_base, "--crystal_structure", "FCC", "--rmsd", "0.1"]
     _run(command)
     annotated_dump = f"{intermediate_base}_annotated.dump"
     clusters_table = f"{intermediate_base}_clusters.table"
@@ -193,7 +193,7 @@ def _run_inline_ptm(input_dump: str, scratch_dir: Path) -> tuple[str, str, str]:
 
 
 def _ensure_structure_id_artifacts(args: list[str], scratch_dir: Path) -> list[str]:
-    if _has_flag(args, "--clusters-table") and _has_flag(args, "--clusters-transitions"):
+    if _has_flag(args, "--clusters_table") and _has_flag(args, "--clusters_transitions"):
         return args
     if len(args) < 2:
         raise WrapperError("Se esperaban al menos 2 argumentos: <input_dump> <output_base>")
@@ -212,10 +212,10 @@ def _apply_pipeline_input_overrides(args: list, config: dict) -> list:
     if not annotated_path:
         return args
     next_args = [annotated_path, *args[1:]] if args else [annotated_path]
-    next_args = _append_flag_if_missing(next_args, "--clusters-table", _artifact_path(artifacts, "clustersTable"))
+    next_args = _append_flag_if_missing(next_args, "--clusters_table", _artifact_path(artifacts, "clustersTable"))
     next_args = _append_flag_if_missing(
         next_args,
-        "--clusters-transitions",
+        "--clusters_transitions",
         _artifact_path(artifacts, "clustersTransitions"),
     )
     return next_args

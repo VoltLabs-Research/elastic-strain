@@ -101,7 +101,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
     if(_clustersTablePath.empty() || _clusterTransitionsPath.empty()){
         return AnalysisResult::failure(
-            "ElasticStrain requires --clusters-table and --clusters-transitions"
+            "ElasticStrain requires --clusters_table and --clusters_transitions"
         );
     }
 
