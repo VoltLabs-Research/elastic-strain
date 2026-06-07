@@ -1,0 +1,29 @@
+{
+  "name": "@voltlabs/elastic-strain",
+  "version": "1.0.1",
+  "kind": "workflow",
+  "publisher": "voltlabs",
+  "description": "Calculates per-atom elastic strain tensors using a reference crystal structure and lattice constant.",
+  "license": "MIT",
+  "homepage": "https://github.com/voltlabs-research/elastic-strain",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voltlabs-research/elastic-strain"
+  },
+  "entrypoints": {
+    "binary": "elastic-strain-plugin.zip",
+    "workflow": "plugin.json"
+  },
+  "platforms": [
+    "linux-x86_64",
+    "darwin-arm64",
+    "windows-x86_64"
+  ],
+  "coretoolkit": "1.0.0",
+  "files": [
+    "plugin.json",
+    "scripts",
+    "bin",
+    "lib"
+  ]
+}
