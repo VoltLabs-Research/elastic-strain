@@ -277,6 +277,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             exportWrapper["sub_listings"] = {
                 {"structures", structuresListing}
             };
+            exportWrapper["per-atom-properties"] = perAtom;
             exportWrapper["export"] = json::object();
             exportWrapper["export"]["AtomisticExporter"] = atomsByStructure;
             const std::string atomsPath = outputFilename + "_atoms.msgpack";
