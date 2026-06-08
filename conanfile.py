@@ -4,7 +4,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 class ElasticStrainConan(ConanFile):
     name = "elastic-strain"
-    version = "1.0.3"
+    version = "1.0.4"
     package_type = "static-library"
     license = "MIT"
     settings = "os", "arch", "compiler", "build_type"
@@ -17,7 +17,7 @@ class ElasticStrainConan(ConanFile):
         "spdlog/1.14.1",
         "nlohmann_json/3.11.3",
     )
-    exports_sources = "CMakeLists.txt", "include/*", "src/*"
+    exports_sources = "CMakeLists.txt", "include/*", "src/*", "share/*", "share/**/*"
 
     def layout(self):
         cmake_layout(self)
