@@ -15,7 +15,7 @@
             "icon": "HiCube",
             "author": "Rodolfo Herrera",
             "license": "MIT",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "homepage": "https://github.com/rodyherrera/Volterra",
             "description": "Calcula el tensor de deformacion elastica por atomo dado un tipo de estructura cristalina y constante de red."
           }
@@ -139,7 +139,7 @@
             "binary": "elastic-strain",
             "binaryObjectPath": "__UPLOAD_BINARY_OBJECT_PATH__",
             "binaryFileName": "elastic-strain",
-            "arguments": "{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}",
+            "arguments": "{{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }} --clusters_table {{ foreach-trajectory-dumps.outputPath }}_clusters.table --clusters_transitions {{ foreach-trajectory-dumps.outputPath }}_cluster_transitions.table {{ plugin-arguments.as_str }}",
             "timeout": -1,
             "inputs": [
               {
