@@ -162,6 +162,10 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         json a;
         a["id"] = frame.ids[i];
 
+        Cluster* cluster = analysis.atomCluster(static_cast<int>(i));
+        a["cluster_id"] = cluster ? cluster->id : 0;
+        a["structure_type"] = atomStructureTypes[i];
+
         if(volumetric) a["volumetric_strain"] = volumetric->getDouble(i);
 
         if(strainTensor){
