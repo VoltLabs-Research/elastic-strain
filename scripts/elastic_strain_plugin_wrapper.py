@@ -20,7 +20,7 @@ PTM_BINARY_NAME = "polyhedral-template-matching"
 PLUGIN_REPO_DIRNAME = "ElasticStrain"
 ENV_BINARY_OVERRIDE = "VOLT_ELASTIC_STRAIN_BINARY"
 ENV_PTM_BINARY_OVERRIDE = "VOLT_PTM_BINARY"
-REQUIRED_OUTPUTS = ["_elastic_strain.msgpack", "_atoms.msgpack"]
+REQUIRED_OUTPUTS = ["_elastic_strain.parquet", "_atoms.parquet"]
 LOG_TAG = "elastic-strain-plugin"
 
 SCRIPT_DIR = Path(__file__).resolve().parent

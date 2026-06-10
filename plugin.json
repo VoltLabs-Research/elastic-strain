@@ -176,7 +176,7 @@
           "exposure": {
             "name": "Elastic Strain",
             "icon": "HiCube",
-            "results": "elastic_strain.msgpack",
+            "results": "elastic_strain.parquet",
             "iterable": ""
           }
         }
@@ -207,7 +207,7 @@
           "exposure": {
             "name": "Elastic Strain Model",
             "icon": "HiCube",
-            "results": "atoms.msgpack",
+            "results": "atoms.parquet",
             "iterable": ""
           }
         }
