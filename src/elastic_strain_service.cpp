@@ -185,14 +185,14 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     result["per-atom-properties"] = perAtom;
 
     if(!outputFilename.empty()){
-        const std::string outputPath = outputFilename + "_elastic_strain.msgpack";
-        if(JsonUtils::writeJsonMsgpackToFile(result, outputPath, false)){
-            spdlog::info("Elastic strain msgpack written to {}", outputPath);
+        const std::string outputPath = outputFilename + "_elastic_strain.parquet";
+        if(JsonUtils::writeJsonToParquet(result, outputPath, false)){
+            spdlog::info("Elastic strain parquet written to {}", outputPath);
         }else{
-            spdlog::warn("Could not write elastic strain msgpack: {}", outputPath);
+            spdlog::warn("Could not write elastic strain parquet: {}", outputPath);
         }
 
-        // --- atoms.msgpack export (Structure Identification exposure) ---
+        // --- atoms.parquet export (Structure Identification exposure) ---
         // Canonical per-atom envelope + the strain quantities the engine
         // just computed (volumetric strain, 6-component symmetric strain
         // tensor, 9-component elastic deformation gradient). Matches
@@ -284,11 +284,11 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             exportWrapper["per-atom-properties"] = perAtom;
             exportWrapper["export"] = json::object();
             exportWrapper["export"]["AtomisticExporter"] = atomsByStructure;
-            const std::string atomsPath = outputFilename + "_atoms.msgpack";
-            if(JsonUtils::writeJsonMsgpackToFile(exportWrapper, atomsPath, false)){
+            const std::string atomsPath = outputFilename + "_atoms.parquet";
+            if(JsonUtils::writeJsonToParquet(exportWrapper, atomsPath, false)){
                 spdlog::info("Exported atoms data to: {}", atomsPath);
             }else{
-                spdlog::warn("Could not write atoms msgpack: {}", atomsPath);
+                spdlog::warn("Could not write atoms parquet: {}", atomsPath);
             }
         }
     }
