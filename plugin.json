@@ -32,15 +32,16 @@
           "arguments": {
             "arguments": [
               {
-                "argument": "structure_analysis_plugin",
-                "type": "pluginReference",
-                "label": "Structure Analysis Algorithm",
-                "required": true,
-                "showPluginConfiguration": true,
-                "pluginReferenceFilterKeys": [
-                  "polyhedral-template-matching",
-                  "adaptive-common-neighbor-analysis"
-                ]
+                "argument": "clusters_table",
+                "type": "string",
+                "label": "Clusters Table",
+                "inferFromContext": true
+              },
+              {
+                "argument": "clusters_transitions",
+                "type": "string",
+                "label": "Clusters Transitions",
+                "inferFromContext": true
               },
               {
                 "argument": "lattice_constant",
@@ -141,7 +142,7 @@
             "binaryFileName": "elastic-strain-plugin.zip",
             "entrypointScript": "bin/elastic-strain",
             "requirementsFile": "",
-            "arguments": "{{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }} --clusters_table {{ foreach-trajectory-dumps.outputPath }}_clusters.table --clusters_transitions {{ foreach-trajectory-dumps.outputPath }}_cluster_transitions.table --lattice_dir {{ analysis-entrypoint.projectPath }}/share/volt/lattices {{ plugin-arguments.as_str }}",
+            "arguments": "{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} --lattice_dir {{ analysis-entrypoint.projectPath }}/share/volt/lattices {{ plugin-arguments.as_str }}",
             "timeout": -1,
             "inputs": [
               {
@@ -178,21 +179,6 @@
             "icon": "HiCube",
             "results": "elastic_strain.parquet",
             "iterable": ""
-          }
-        }
-      },
-      {
-        "id": "structure-analysis-plugin",
-        "type": "plugin-node",
-        "position": {
-          "x": 1392,
-          "y": 208
-        },
-        "data": {
-          "pluginNode": {
-            "executionMode": "argumentReference",
-            "argumentReference": "structure_analysis_plugin",
-            "outputPathMode": "parent"
           }
         }
       },
@@ -257,15 +243,8 @@
         "targetHandle": "input"
       },
       {
-        "id": "edge-foreach-structure-analysis",
+        "id": "edge-foreach-entrypoint",
         "source": "foreach-trajectory-dumps",
-        "sourceHandle": "output",
-        "target": "structure-analysis-plugin",
-        "targetHandle": "input"
-      },
-      {
-        "id": "edge-structure-analysis-entrypoint",
-        "source": "structure-analysis-plugin",
         "sourceHandle": "output",
         "target": "analysis-entrypoint",
         "targetHandle": "input"
