@@ -156,26 +156,29 @@ def _with_structure_id_artifacts(
     annotated_dump: str,
     clusters_table: str,
     cluster_transitions: str,
+    neighbor_lattice: str,
 ) -> list[str]:
     new_args = [annotated_dump, *args[1:]] if args else [annotated_dump]
     new_args = _append_flag_if_missing(new_args, "--clusters_table", clusters_table)
     new_args = _append_flag_if_missing(new_args, "--clusters_transitions", cluster_transitions)
+    new_args = _append_flag_if_missing(new_args, "--neighbor_lattice", neighbor_lattice)
     return new_args
 
 
-def _find_parent_output_artifacts(args: list[str]) -> tuple[str, str, str] | None:
+def _find_parent_output_artifacts(args: list[str]) -> tuple[str, str, str, str] | None:
     if len(args) < 2:
         return None
     output_base = args[1]
     annotated_dump = f"{output_base}_annotated.dump"
     clusters_table = f"{output_base}_clusters.table"
     cluster_transitions = f"{output_base}_cluster_transitions.table"
-    if all(Path(path).exists() for path in (annotated_dump, clusters_table, cluster_transitions)):
-        return annotated_dump, clusters_table, cluster_transitions
+    neighbor_lattice = f"{output_base}_neighbor_lattice.parquet"
+    if all(Path(path).exists() for path in (annotated_dump, clusters_table, cluster_transitions, neighbor_lattice)):
+        return annotated_dump, clusters_table, cluster_transitions, neighbor_lattice
     return None
 
 
-def _run_inline_ptm(input_dump: str, scratch_dir: Path) -> tuple[str, str, str]:
+def _run_inline_ptm(input_dump: str, scratch_dir: Path) -> tuple[str, str, str, str]:
     ptm_binary = _resolve_binary(PTM_BINARY_NAME, ENV_PTM_BINARY_OVERRIDE, "PolyhedralTemplateMatching")
     _ensure_executable(ptm_binary)
     if EMBEDDED_LOADER.exists():
@@ -186,22 +189,25 @@ def _run_inline_ptm(input_dump: str, scratch_dir: Path) -> tuple[str, str, str]:
     annotated_dump = f"{intermediate_base}_annotated.dump"
     clusters_table = f"{intermediate_base}_clusters.table"
     cluster_transitions = f"{intermediate_base}_cluster_transitions.table"
-    for path in (annotated_dump, clusters_table, cluster_transitions):
+    neighbor_lattice = f"{intermediate_base}_neighbor_lattice.parquet"
+    for path in (annotated_dump, clusters_table, cluster_transitions, neighbor_lattice):
         if not Path(path).exists():
             raise WrapperError(f"Inline PTM did not produce {path}")
-    return annotated_dump, clusters_table, cluster_transitions
+    return annotated_dump, clusters_table, cluster_transitions, neighbor_lattice
 
 
 def _ensure_structure_id_artifacts(args: list[str], scratch_dir: Path) -> list[str]:
-    if _has_flag(args, "--clusters_table") and _has_flag(args, "--clusters_transitions"):
+    if (_has_flag(args, "--clusters_table")
+            and _has_flag(args, "--clusters_transitions")
+            and _has_flag(args, "--neighbor_lattice")):
         return args
     if len(args) < 2:
         raise WrapperError("Se esperaban al menos 2 argumentos: <input_dump> <output_base>")
     parent_artifacts = _find_parent_output_artifacts(args)
     if parent_artifacts is not None:
         return _with_structure_id_artifacts(args, *parent_artifacts)
-    annotated_dump, clusters_table, cluster_transitions = _run_inline_ptm(args[0], scratch_dir)
-    return _with_structure_id_artifacts(args, annotated_dump, clusters_table, cluster_transitions)
+    annotated_dump, clusters_table, cluster_transitions, neighbor_lattice = _run_inline_ptm(args[0], scratch_dir)
+    return _with_structure_id_artifacts(args, annotated_dump, clusters_table, cluster_transitions, neighbor_lattice)
 
 
 def _apply_pipeline_input_overrides(args: list, config: dict) -> list:
@@ -217,6 +223,11 @@ def _apply_pipeline_input_overrides(args: list, config: dict) -> list:
         next_args,
         "--clusters_transitions",
         _artifact_path(artifacts, "clustersTransitions"),
+    )
+    next_args = _append_flag_if_missing(
+        next_args,
+        "--neighbor_lattice",
+        _artifact_path(artifacts, "neighborLattice"),
     )
     return next_args
 

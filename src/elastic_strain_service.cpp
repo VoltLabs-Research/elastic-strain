@@ -82,6 +82,10 @@ void ElasticStrainService::setClusterTransitionsPath(std::string path){
     _clusterTransitionsPath = std::move(path);
 }
 
+void ElasticStrainService::setNeighborLatticePath(std::string path){
+    _neighborLatticePath = std::move(path);
+}
+
 void ElasticStrainService::setParameters(
     double latticeConstant,
     double caRatio,
@@ -104,6 +108,11 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             "ElasticStrain requires --clusters_table and --clusters_transitions"
         );
     }
+    if(_neighborLatticePath.empty()){
+        return AnalysisResult::failure(
+            "ElasticStrain requires --neighbor_lattice (per-atom neighbor topology parquet)"
+        );
+    }
 
     FrameAdapter::PreparedAnalysisInput prepared;
     std::string frameError;
@@ -119,6 +128,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     std::string reconstructionError;
     if(!ReconstructedStructureLoader::load(
         frame,
+        _neighborLatticePath,
         {_clustersTablePath, _clusterTransitionsPath},
         analysis,
         context,
