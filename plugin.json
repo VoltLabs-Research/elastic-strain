@@ -15,7 +15,7 @@
             "icon": "HiCube",
             "author": "Rodolfo Herrera",
             "license": "MIT",
-            "version": "2.0.2",
+            "version": "2.0.3",
             "homepage": "https://github.com/voltlabs-research/elastic-strain",
             "description": "Calcula el tensor de deformacion elastica por atomo dado un tipo de estructura cristalina y constante de red."
           }
@@ -46,6 +46,17 @@
                 "argument": "clusters_transitions",
                 "type": "string",
                 "label": "Clusters Transitions",
+                "inferFromContext": true,
+                "plugins": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis",
+                  "pattern-structure-matching"
+                ]
+              },
+              {
+                "argument": "neighbor_lattice",
+                "type": "string",
+                "label": "Neighbor Lattice",
                 "inferFromContext": true,
                 "plugins": [
                   "polyhedral-template-matching",
@@ -171,6 +182,12 @@
                 "required": true,
                 "cliFlag": "--clusters_transitions",
                 "description": "Cluster transitions table produced by an upstream structure-identification step."
+              },
+              {
+                "name": "neighborLattice",
+                "required": true,
+                "cliFlag": "--neighbor_lattice",
+                "description": "Per-atom neighbor topology parquet (neighbor_indices_* + neighbor_lattice_*) produced by an upstream structure-identification step."
               }
             ]
           }

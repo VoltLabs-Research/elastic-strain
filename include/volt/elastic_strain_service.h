@@ -17,6 +17,7 @@ public:
     void setInputCrystalStructure(LatticeStructureType structure);
     void setClustersTablePath(std::string path);
     void setClusterTransitionsPath(std::string path);
+    void setNeighborLatticePath(std::string path);
 
     void setParameters(
         double latticeConstant,
@@ -35,6 +36,7 @@ private:
     LatticeStructureType _inputCrystalStructure;
     std::string _clustersTablePath;
     std::string _clusterTransitionsPath;
+    std::string _neighborLatticePath;
 
     double _latticeConstant;
     double _caRatio;

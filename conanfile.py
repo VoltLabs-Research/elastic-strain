@@ -4,7 +4,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 class ElasticStrainConan(ConanFile):
     name = "elastic-strain"
-    version = "2.0.2"
+    version = "2.0.3"
     package_type = "static-library"
     license = "MIT"
     settings = "os", "arch", "compiler", "build_type"
@@ -12,8 +12,8 @@ class ElasticStrainConan(ConanFile):
     requires = (
         "boost/1.88.0",
         "onetbb/2021.12.0",
-        "coretoolkit/[>=2.0]",
-        "structure-identification/[>=2.0]",
+        "coretoolkit/[>=2.5]",
+        "structure-identification/[>=2.1]",
         "spdlog/1.14.1",
         "nlohmann_json/3.11.3",
     )

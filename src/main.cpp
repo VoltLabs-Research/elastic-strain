@@ -28,6 +28,7 @@ void showUsage(const std::string& name) {
     std::cerr
         << "  --clusters_table <path>       Path to *_clusters.table exported upstream.\n"
         << "  --clusters_transitions <path> Path to *_cluster_transitions.table exported upstream.\n"
+        << "  --neighbor_lattice <path>     Path to *_neighbor_lattice.parquet exported upstream.\n"
         << "  --crystal_structure <type>     Crystal structure. (BCC|FCC|HCP|...) [default: BCC]\n"
         << "  --lattice_dir <path>          Directory containing lattice topology YAMLs.\n"
         << "  --lattice_constant <float>     Lattice constant a₀. [required]\n"
@@ -123,6 +124,7 @@ int main(int argc, char* argv[]){
     ElasticStrainService analyzer;
     analyzer.setClustersTablePath(getString(opts, "--clusters_table"));
     analyzer.setClusterTransitionsPath(getString(opts, "--clusters_transitions"));
+    analyzer.setNeighborLatticePath(getString(opts, "--neighbor_lattice"));
     analyzer.setInputCrystalStructure(parseCrystalStructure(getString(opts, "--crystal_structure", "BCC")));
     analyzer.setParameters(
         getDouble(opts, "--lattice_constant", 1.63),
