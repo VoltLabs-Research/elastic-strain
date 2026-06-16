@@ -15,7 +15,7 @@
             "icon": "HiCube",
             "author": "Rodolfo Herrera",
             "license": "MIT",
-            "version": "2.0.1",
+            "version": "2.0.2",
             "homepage": "https://github.com/voltlabs-research/elastic-strain",
             "description": "Calcula el tensor de deformacion elastica por atomo dado un tipo de estructura cristalina y constante de red."
           }
@@ -35,13 +35,23 @@
                 "argument": "clusters_table",
                 "type": "string",
                 "label": "Clusters Table",
-                "inferFromContext": true
+                "inferFromContext": true,
+                "plugins": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis",
+                  "pattern-structure-matching"
+                ]
               },
               {
                 "argument": "clusters_transitions",
                 "type": "string",
                 "label": "Clusters Transitions",
-                "inferFromContext": true
+                "inferFromContext": true,
+                "plugins": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis",
+                  "pattern-structure-matching"
+                ]
               },
               {
                 "argument": "lattice_constant",
