@@ -1,5 +1,6 @@
 #include <volt/cli/common.h>
 #include <volt/elastic_strain_service.h>
+#include <volt/plugin/option_reader.h>
 #include <volt/structures/crystal_structure_types.h>
 #include <volt/structures/crystal_topology_registry.h>
 #include <oneapi/tbb/global_control.h>
@@ -11,6 +12,7 @@
 
 using namespace Volt;
 using namespace Volt::CLI;
+using namespace Volt::Plugin;
 
 LatticeStructureType parseCrystalStructure(const std::string& str) {
     if (str == "FCC") return LATTICE_FCC;
@@ -23,40 +25,45 @@ LatticeStructureType parseCrystalStructure(const std::string& str) {
     return LATTICE_BCC;
 }
 
-void showUsage(const std::string& name) {
-    printUsageHeader(name, "Volt - Elastic Strain Analysis");
-    std::cerr
-        << "  --clusters_table <path>       Path to *_clusters.table exported upstream.\n"
-        << "  --clusters_transitions <path> Path to *_cluster_transitions.table exported upstream.\n"
-        << "  --neighbor_lattice <path>     Path to *_neighbor_lattice.parquet exported upstream.\n"
-        << "  --crystal_structure <type>     Crystal structure. (BCC|FCC|HCP|...) [default: BCC]\n"
-        << "  --lattice_dir <path>          Directory containing lattice topology YAMLs.\n"
-        << "  --lattice_constant <float>     Lattice constant a₀. [required]\n"
-        << "  --ca_ratio <float>             c/a ratio for HCP/hex crystals. [default: 1.0]\n"
-        << "  --push_forward                 Push to spatial frame (Euler strain). [default: false]\n"
-        << "  --calc_deformation_gradient     Compute deformation gradient F. [default: true]\n"
-        << "  --calc_strain_tensors           Compute strain tensors. [default: true]\n"
-        << "  --threads <int>               Max worker threads (TBB/OMP). [default: auto]\n";
-    printHelpOption();
+static PluginDescriptor buildDescriptor() {
+    return {
+        "volt-elastic-strain",
+        "Elastic Strain Analysis",
+        {
+            {"--clusters_table", "path", "Clusters table exported by an upstream structure-identification step.", "", {}, ""},
+            {"--clusters_transitions", "path", "Cluster transitions table exported upstream.", "", {}, ""},
+            {"--neighbor_lattice", "path", "Per-atom neighbor topology parquet exported upstream.", "", {}, ""},
+            {"--crystal_structure", "enum", "Crystal structure to match against.", "BCC",
+             {"BCC", "FCC", "HCP", "SC", "CUBIC_DIAMOND", "HEX_DIAMOND"}, ""},
+            {"--lattice_dir", "path", "Directory containing lattice topology YAMLs.", "", {},
+             "share/volt/lattices"},
+            {"--lattice_constant", "float", "Lattice constant a0. Required.", "", {}, ""},
+            {"--ca_ratio", "float", "c/a ratio for HCP/hex crystals.", "1.0", {}, ""},
+            {"--push_forward", "bool", "Push to spatial frame (Euler strain).", "false", {}, ""},
+            {"--calc_deformation_gradient", "bool", "Compute deformation gradient F.", "true", {}, ""},
+            {"--calc_strain_tensors", "bool", "Compute strain tensors.", "true", {}, ""},
+        }
+    };
 }
 
 int main(int argc, char* argv[]){
+    const PluginDescriptor descriptor = buildDescriptor();
+
     if(argc < 2){
-        showUsage(argv[0]);
+        showPluginUsage(argv[0], descriptor);
         return 1;
     }
 
     std::string filename, outputBase;
     auto opts = parseArgs(argc, argv, filename, outputBase);
 
-    if(hasOption(opts, "--help") || filename.empty()){
-        showUsage(argv[0]);
-        return filename.empty() ? 1 : 0;
+    if(auto exitCode = handleIntrospection(argv[0], descriptor, opts, filename)){
+        return *exitCode;
     }
 
     if(!hasOption(opts, "--lattice_constant")){
         spdlog::error("--lattice_constant is required for elastic strain analysis.");
-        showUsage(argv[0]);
+        showPluginUsage(argv[0], descriptor);
         return 1;
     }
 
@@ -109,7 +116,9 @@ int main(int argc, char* argv[]){
     initLogging("volt-elastic-strain");
     spdlog::info("Using {} threads (OneTBB)", requestedThreads);
 
-    const std::string latticeDirectory = getString(opts, "--lattice_dir", "");
+    const OptionReader options(descriptor, opts);
+
+    const std::string latticeDirectory = options.text("--lattice_dir");
     if(!latticeDirectory.empty()){
         setCrystalTopologySearchRoot(latticeDirectory);
         spdlog::info("Using lattice directory: {}", latticeDirectory);
@@ -122,16 +131,16 @@ int main(int argc, char* argv[]){
     spdlog::info("Output base: {}", outputBase);
 
     ElasticStrainService analyzer;
-    analyzer.setClustersTablePath(getString(opts, "--clusters_table"));
-    analyzer.setClusterTransitionsPath(getString(opts, "--clusters_transitions"));
-    analyzer.setNeighborLatticePath(getString(opts, "--neighbor_lattice"));
-    analyzer.setInputCrystalStructure(parseCrystalStructure(getString(opts, "--crystal_structure", "BCC")));
+    analyzer.setClustersTablePath(options.text("--clusters_table"));
+    analyzer.setClusterTransitionsPath(options.text("--clusters_transitions"));
+    analyzer.setNeighborLatticePath(options.text("--neighbor_lattice"));
+    analyzer.setInputCrystalStructure(parseCrystalStructure(options.text("--crystal_structure")));
     analyzer.setParameters(
-        getDouble(opts, "--lattice_constant", 1.63),
-        getDouble(opts, "--ca_ratio", 1.0),
-        getBool(opts, "--push_forward", false),
-        getBool(opts, "--calc_deformation_gradient", true),
-        getBool(opts, "--calc_strain_tensors", true)
+        options.number("--lattice_constant"),
+        options.number("--ca_ratio"),
+        options.boolean("--push_forward"),
+        options.boolean("--calc_deformation_gradient"),
+        options.boolean("--calc_strain_tensors")
     );
 
     spdlog::info("Starting elastic strain analysis...");
