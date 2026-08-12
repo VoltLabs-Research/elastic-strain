@@ -15,9 +15,110 @@
             "icon": "HiCube",
             "author": "Rodolfo Herrera",
             "license": "MIT",
-            "version": "2.0.3",
+            "version": "2.0.4",
             "homepage": "https://github.com/voltlabs-research/elastic-strain",
             "description": "Calcula el tensor de deformacion elastica por atomo dado un tipo de estructura cristalina y constante de red."
+          }
+        }
+      },
+      {
+        "id": "plugin-arguments",
+        "type": "arguments",
+        "position": {
+          "x": 528,
+          "y": 208
+        },
+        "data": {
+          "arguments": {
+            "arguments": [
+              {
+                "argument": "clusters_table",
+                "type": "string",
+                "label": "Clusters Table",
+                "inferFromContext": true,
+                "plugins": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis",
+                  "pattern-structure-matching"
+                ]
+              },
+              {
+                "argument": "clusters_transitions",
+                "type": "string",
+                "label": "Clusters Transitions",
+                "inferFromContext": true,
+                "plugins": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis",
+                  "pattern-structure-matching"
+                ]
+              },
+              {
+                "argument": "neighbor_lattice",
+                "type": "string",
+                "label": "Neighbor Lattice",
+                "inferFromContext": true,
+                "plugins": [
+                  "polyhedral-template-matching",
+                  "adaptive-common-neighbor-analysis",
+                  "pattern-structure-matching"
+                ]
+              },
+              {
+                "argument": "lattice_constant",
+                "type": "number",
+                "label": "Lattice Constant",
+                "default": 3.615,
+                "min": 0,
+                "step": 0.01
+              },
+              {
+                "argument": "crystal_structure",
+                "type": "select",
+                "label": "Crystal Structure",
+                "default": "FCC",
+                "options": [
+                  {
+                    "key": "FCC",
+                    "label": "FCC"
+                  },
+                  {
+                    "key": "BCC",
+                    "label": "BCC"
+                  },
+                  {
+                    "key": "HCP",
+                    "label": "HCP"
+                  }
+                ]
+              },
+              {
+                "argument": "ca_ratio",
+                "type": "number",
+                "label": "c/a Ratio",
+                "default": 1,
+                "min": 0,
+                "step": 0.01
+              },
+              {
+                "argument": "push_forward",
+                "type": "boolean",
+                "label": "Push Forward",
+                "default": false
+              },
+              {
+                "argument": "calc_deformation_gradient",
+                "type": "boolean",
+                "label": "Calc Deformation Gradient",
+                "default": true
+              },
+              {
+                "argument": "calc_strain_tensors",
+                "type": "boolean",
+                "label": "Calc Strain Tensors",
+                "default": true
+              }
+            ]
           }
         }
       },
@@ -62,7 +163,7 @@
             "binaryFileName": "elastic-strain-plugin.zip",
             "entrypointScript": "bin/elastic-strain",
             "requirementsFile": "",
-            "arguments": "{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }}",
+            "arguments": "{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}",
             "timeout": -1
           }
         }
@@ -116,6 +217,20 @@
     ],
     "edges": [
       {
+        "id": "edge-metadata-arguments",
+        "source": "plugin-metadata",
+        "sourceHandle": "output",
+        "target": "plugin-arguments",
+        "targetHandle": "input"
+      },
+      {
+        "id": "edge-arguments-context",
+        "source": "plugin-arguments",
+        "sourceHandle": "output",
+        "target": "trajectory-context",
+        "targetHandle": "input"
+      },
+      {
         "id": "edge-context-foreach",
         "source": "trajectory-context",
         "sourceHandle": "output",
@@ -148,13 +263,6 @@
         "source": "elastic-strain-model-exposure",
         "sourceHandle": "output",
         "target": "elastic-strain-model-export",
-        "targetHandle": "input"
-      },
-      {
-        "id": "edge-plugin-metadata-trajectory-context",
-        "source": "plugin-metadata",
-        "sourceHandle": "output",
-        "target": "trajectory-context",
         "targetHandle": "input"
       }
     ]
