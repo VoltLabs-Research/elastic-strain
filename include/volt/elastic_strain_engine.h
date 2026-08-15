@@ -23,27 +23,22 @@ public:
 
     void perform();
 
-    // Returns the array of atom cluster IDs
     ParticleProperty* atomClusters() const{
         return _context.atomClusters ? _context.atomClusters.get() : nullptr;
     }
 
-    // Returns the created cluster graph
     const StructureAnalysis& structureAnalysis() const{
         return _structureAnalysis;
     }
 
-    // Returns the property storage that contains the computed per-particle volumetric strain values
     ParticleProperty* volumetricStrains() const{
         return _volumetricStrains.get();
     }
 
-    // Returns the property storage that contains the computed per-particle strain tensors
     ParticleProperty* strainTensors() const{
         return _strainTensors.get();
     }
 
-    // Returns the property storage that contains the computed per-particle deformation gradient tensors
     ParticleProperty* deformationGradients() const{
         return _deformationGradients.get();
     }

@@ -202,13 +202,6 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             spdlog::warn("Could not write elastic strain parquet: {}", outputPath);
         }
 
-        // --- atoms.parquet export (Structure Identification exposure) ---
-        // Canonical per-atom envelope + the strain quantities the engine
-        // just computed (volumetric strain, 6-component symmetric strain
-        // tensor, 9-component elastic deformation gradient). Matches
-        // OVITO's ElasticStrainModifier output (StructureTypeProperty,
-        // ClusterProperty, ElasticStrainTensorProperty,
-        // ElasticDeformationGradientProperty).
         {
             constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
             std::vector<std::string> names(K);
