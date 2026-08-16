@@ -14,8 +14,6 @@ namespace Volt{
 
 using namespace Volt::Particles;
 
-namespace {
-
 std::string structureTypeNameForExport(int structureType){
     switch(static_cast<StructureType>(structureType)){
         case StructureType::SC:
@@ -58,8 +56,6 @@ std::vector<int> buildAtomStructureTypes(const StructureAnalysis& analysis, std:
         }
     }
     return structureTypes;
-}
-
 }
 
 ElasticStrainService::ElasticStrainService()
