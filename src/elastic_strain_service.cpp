@@ -153,6 +153,11 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
     const size_t n = static_cast<size_t>(frame.natoms);
     const std::vector<int> atomStructureTypes = buildAtomStructureTypes(analysis, n);
+    const auto structureTypeAt = [&atomStructureTypes](size_t i){
+        const int raw = atomStructureTypes[i];
+        return (0 <= raw && raw < static_cast<int>(StructureType::NUM_STRUCTURE_TYPES))
+            ? raw : static_cast<int>(StructureType::OTHER);
+    };
     double totalVolumetric = 0.0;
     for(size_t i = 0; i < n; i++){
         if(volumetric) totalVolumetric += volumetric->getDouble(i);
@@ -170,7 +175,9 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
         Cluster* cluster = analysis.atomCluster(static_cast<int>(i));
         a["cluster_id"] = cluster ? cluster->id : 0;
-        a["structure_type"] = atomStructureTypes[i];
+        const int structureType = structureTypeAt(i);
+        a["structure_id"] = structureType;
+        a["structure_name"] = structureTypeNameForExport(structureType);
 
         if(volumetric) a["volumetric_strain"] = volumetric->getDouble(i);
 
@@ -205,11 +212,8 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
                 names[st] = structureTypeNameForExport(st);
 
             std::vector<std::vector<size_t>> structureAtomIndices(K);
-            for(size_t i = 0; i < n; ++i){
-                const int raw = atomStructureTypes[i];
-                const int st = (0 <= raw && raw < K) ? raw : static_cast<int>(StructureType::OTHER);
-                structureAtomIndices[static_cast<size_t>(st)].push_back(i);
-            }
+            for(size_t i = 0; i < n; ++i)
+                structureAtomIndices[static_cast<size_t>(structureTypeAt(i))].push_back(i);
 
             std::vector<int> structureOrder;
             structureOrder.reserve(K);
@@ -238,13 +242,9 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
                         {"id", frame.ids[atomIndex]},
                         {"pos", {pos.x(), pos.y(), pos.z()}},
                         {"structure_id", st},
-                        {"structure_type", st},
                         {"structure_name", names[st]},
                         {"cluster_id", clusterId}
                     };
-                    if(cluster && !cluster->topologyName.empty()){
-                        atom["topology_name"] = cluster->topologyName;
-                    }
                     if(volumetric){
                         atom["volumetric_strain"] = volumetric->getDouble(atomIndex);
                     }

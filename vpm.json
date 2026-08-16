@@ -1,6 +1,6 @@
 {
   "name": "@voltlabs/elastic-strain",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "kind": "workflow",
   "publisher": "voltlabs",
   "description": "Calculates per-atom elastic strain tensors using a reference crystal structure and lattice constant.",
