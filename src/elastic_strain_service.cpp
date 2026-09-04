@@ -199,11 +199,8 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
     if(!outputFilename.empty()){
         const std::string outputPath = outputFilename + "_elastic_strain.parquet";
-        if(JsonUtils::writeJsonToParquet(result, outputPath, false)){
-            spdlog::info("Elastic strain parquet written to {}", outputPath);
-        }else{
-            spdlog::warn("Could not write elastic strain parquet: {}", outputPath);
-        }
+        JsonUtils::writeJsonToParquet(result, outputPath, false);
+        spdlog::info("Elastic strain parquet written to {}", outputPath);
 
         {
             constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
@@ -284,11 +281,8 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             exportWrapper["export"] = json::object();
             exportWrapper["export"]["AtomisticExporter"] = atomsByStructure;
             const std::string atomsPath = outputFilename + "_atoms.parquet";
-            if(JsonUtils::writeJsonToParquet(exportWrapper, atomsPath, false)){
-                spdlog::info("Exported atoms data to: {}", atomsPath);
-            }else{
-                spdlog::warn("Could not write atoms parquet: {}", atomsPath);
-            }
+            JsonUtils::writeJsonToParquet(exportWrapper, atomsPath, false);
+            spdlog::info("Exported atoms data to: {}", atomsPath);
         }
     }
 
