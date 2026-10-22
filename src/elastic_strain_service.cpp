@@ -9,6 +9,8 @@
 #include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <cstdint>
+#include <cstdio>
 #include <limits>
 #include <utility>
 
@@ -254,6 +256,26 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             for(size_t i = 0; i < n; ++i){
                 Cluster* cluster = analysis.atomCluster(static_cast<int>(i));
                 if(cluster && cluster->id != 0) ++clusteredAtoms;
+            }
+
+            std::string structureSummary;
+            for(int st : structureOrder){
+                const size_t count = structureAtomIndices[static_cast<size_t>(st)].size();
+                const char* name = st == static_cast<int>(StructureType::OTHER) ? "Other" : names[st].c_str();
+                char entry[96];
+                std::snprintf(entry, sizeof(entry), "%s%s %zu (%.1f%%)",
+                    structureSummary.empty() ? "" : ", ", name, count, percentOf(count, n));
+                structureSummary += entry;
+            }
+            spdlog::info(
+                "Structure types: {}; {} atoms in clusters ({:.1f}%)",
+                structureSummary, clusteredAtoms, percentOf(static_cast<std::uint64_t>(clusteredAtoms), n)
+            );
+            if(n > 0 && structureAtomIndices[static_cast<size_t>(_inputCrystalStructure)].empty()){
+                spdlog::warn(
+                    "No atom is in a cluster of the {} reference structure, so every elastic strain is zero; check crystal_structure",
+                    latticeStructureTypeName(_inputCrystalStructure)
+                );
             }
 
             json structuresListing = json::array();
