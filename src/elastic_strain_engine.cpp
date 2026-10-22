@@ -1,4 +1,5 @@
 #include <volt/elastic_strain_engine.h>
+#include <volt/core/progress.h>
 
 #include <cmath>
 #include <cassert>
@@ -47,8 +48,9 @@ ElasticStrainEngine::ElasticStrainEngine(
 void ElasticStrainEngine::perform(){
     const std::size_t N = _context.atomCount();
 
+    ProgressReporter progress("Computing elastic strain", N);
     tbb::parallel_for(tbb::blocked_range<std::size_t>(0, N),
-        [this](const tbb::blocked_range<std::size_t>& r){
+        [this, &progress](const tbb::blocked_range<std::size_t>& r){
         for(std::size_t particleIndex = r.begin(); particleIndex < r.end(); ++particleIndex){
 
         Cluster* localCluster = _structureAnalysis.atomCluster(static_cast<int>(particleIndex));
@@ -176,6 +178,7 @@ void ElasticStrainEngine::perform(){
         assert(std::isfinite(volumetricStrain));
         _volumetricStrains->setDouble(particleIndex, volumetricStrain);
     }
+        progress.advance(r.size());
     });
 }
 

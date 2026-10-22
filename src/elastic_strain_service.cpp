@@ -152,7 +152,15 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         _pushForward
     );
 
+    spdlog::info(
+        "Computing elastic strain for {} atoms ({} reference lattice, {})...",
+        context.atomCount(),
+        latticeStructureTypeName(_inputCrystalStructure),
+        _pushForward ? "Euler-Almansi strain in the spatial frame" : "Green-Lagrange strain in the lattice frame"
+    );
+    timer.restart();
     engine.perform();
+    spdlog::info("Elastic strain computed in {}", timer.elapsed());
 
     auto volumetric = engine.volumetricStrains();
     auto strainTensor = engine.strainTensors();
