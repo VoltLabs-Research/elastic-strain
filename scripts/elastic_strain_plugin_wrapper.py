@@ -84,7 +84,9 @@ def _run(command: list[str]) -> None:
     command = _resolve_embedded_runtime_command(command)
     sys.stderr.write(f"[{LOG_TAG}] {' '.join(shlex.quote(part) for part in command)}\n")
     sys.stderr.flush()
-    completed = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=None)
+    # The binaries log to stdout; send that to fd 2 so the log reaches the panel while stdout
+    # stays reserved for the host protocol.
+    completed = subprocess.run(command, stdout=2, stderr=None)
     if completed.returncode != 0:
         raise WrapperError(f"El comando fallo con exit code {completed.returncode}: {command[0]}")
 
