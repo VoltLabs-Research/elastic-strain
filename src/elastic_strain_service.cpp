@@ -5,6 +5,7 @@
 #include <volt/core/analysis_result.h>
 #include <volt/analysis/cluster_graph_io.h>
 #include <volt/analysis/structure_analysis.h>
+#include <volt/core/progress.h>
 #include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -121,6 +122,8 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     context.inputCrystalType = _inputCrystalStructure;
 
     StructureAnalysis analysis(context);
+    spdlog::info("Loading upstream structure identification (clusters, transitions, neighbor lattice)...");
+    Stopwatch timer;
     std::string reconstructionError;
     if(!ReconstructedStructureLoader::load(
         frame,
@@ -133,6 +136,10 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         return AnalysisResult::failure(reconstructionError);
     }
     rebuildImportedClusterParentHierarchy(analysis);
+    // The cluster graph always holds the null cluster 0.
+    const std::size_t clusterCount = analysis.clusterGraph().clusters().empty()
+        ? 0 : analysis.clusterGraph().clusters().size() - 1;
+    spdlog::info("Structure identification loaded in {}: {} clusters", timer.elapsed(), clusterCount);
 
     ElasticStrainEngine engine(
         analysis,
