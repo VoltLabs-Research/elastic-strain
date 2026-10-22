@@ -9,6 +9,7 @@
 #include <volt/utilities/json_utils.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace Volt{
@@ -174,8 +175,21 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             ? raw : static_cast<int>(StructureType::OTHER);
     };
     double totalVolumetric = 0.0;
+    double minVolumetric = std::numeric_limits<double>::infinity();
+    double maxVolumetric = -std::numeric_limits<double>::infinity();
     for(size_t i = 0; i < n; i++){
-        if(volumetric) totalVolumetric += volumetric->getDouble(i);
+        if(volumetric){
+            const double value = volumetric->getDouble(i);
+            totalVolumetric += value;
+            minVolumetric = std::min(minVolumetric, value);
+            maxVolumetric = std::max(maxVolumetric, value);
+        }
+    }
+    if(volumetric && n > 0){
+        spdlog::info(
+            "Volumetric strain: min {:.6f}, mean {:.6f}, max {:.6f}",
+            minVolumetric, totalVolumetric / n, maxVolumetric
+        );
     }
 
     json result;
