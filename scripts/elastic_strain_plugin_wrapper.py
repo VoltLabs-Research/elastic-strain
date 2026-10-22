@@ -80,10 +80,14 @@ def _resolve_embedded_runtime_command(command: list[str]) -> list[str]:
     ]
 
 
+def _log(message: str) -> None:
+    sys.stderr.write(f"[{LOG_TAG}] {message}\n")
+    sys.stderr.flush()
+
+
 def _run(command: list[str]) -> None:
     command = _resolve_embedded_runtime_command(command)
-    sys.stderr.write(f"[{LOG_TAG}] {' '.join(shlex.quote(part) for part in command)}\n")
-    sys.stderr.flush()
+    _log(" ".join(shlex.quote(part) for part in command))
     # The binaries log to stdout; send that to fd 2 so the log reaches the panel while stdout
     # stays reserved for the host protocol.
     completed = subprocess.run(command, stdout=2, stderr=None)
@@ -208,6 +212,7 @@ def _ensure_structure_id_artifacts(args: list[str], scratch_dir: Path) -> list[s
     parent_artifacts = _find_parent_output_artifacts(args)
     if parent_artifacts is not None:
         return _with_structure_id_artifacts(args, *parent_artifacts)
+    _log("no upstream structure identification outputs found; running inline PTM (FCC, rmsd 0.1) first")
     annotated_dump, clusters_table, cluster_transitions, neighbor_lattice = _run_inline_ptm(args[0], scratch_dir)
     return _with_structure_id_artifacts(args, annotated_dump, clusters_table, cluster_transitions, neighbor_lattice)
 
