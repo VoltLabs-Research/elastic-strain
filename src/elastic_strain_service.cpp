@@ -194,6 +194,8 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         );
     }
 
+    spdlog::info("Writing per-atom results for {} atoms...", n);
+    timer.restart();
     json result;
     result["main_listing"] = {
         { "average_volumetric_strain", n > 0 ? totalVolumetric / n : 0.0 }
@@ -337,7 +339,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         }
     }
 
-    spdlog::info("Elastic strain analysis completed.");
+    spdlog::info("Per-atom results written in {}", timer.elapsed());
     return result;
 }
 }
