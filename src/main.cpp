@@ -114,7 +114,9 @@ int main(int argc, char* argv[]){
         static_cast<std::size_t>(std::max(1, requestedThreads))
     );
     initLogging("volt-elastic-strain");
+    const Stopwatch runTimer;
     spdlog::info("Using {} threads (OneTBB)", requestedThreads);
+    Volt::Plugin::logParameters(descriptor, opts);
 
     const OptionReader options(descriptor, opts);
 
@@ -147,10 +149,10 @@ int main(int argc, char* argv[]){
     json result = analyzer.compute(frame, outputBase);
 
     if(result.value("is_failed", false)){
-        spdlog::error("Analysis failed: {}", result.value("error", "Unknown error"));
+        spdlog::error("Analysis failed after {}: {}", runTimer.elapsed(), result.value("error", "Unknown error"));
         return 1;
     }
     
-    spdlog::info("Elastic strain analysis completed.");
+    spdlog::info("{} completed in {}.", descriptor.description, runTimer.elapsed());
     return 0;
 }
