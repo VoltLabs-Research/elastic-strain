@@ -224,18 +224,18 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         if(strainTensor){
             json tensor = json::array();
             for(int c = 0; c < 6; c++) tensor.push_back(strainTensor->getDoubleComponent(i, c));
-            a["strain_tensor"] = tensor;
+            a["strain_tensor"] = std::move(tensor);
         }
 
         if(defGrad){
             json grad = json::array();
             for(int c = 0; c < 9; c++) grad.push_back(defGrad->getDoubleComponent(i, c));
-            a["deformation_gradient"] = grad;
+            a["deformation_gradient"] = std::move(grad);
         }
 
-        perAtom.push_back(a);
+        perAtom.push_back(std::move(a));
     }
-    result["per-atom-properties"] = perAtom;
+    result["per-atom-properties"] = std::move(perAtom);
     steps.next("Writing the elastic strain table");
 
     if(!outputFilename.empty()){
@@ -311,17 +311,17 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
                         json tensor = json::array();
                         for(int c = 0; c < 6; c++)
                             tensor.push_back(strainTensor->getDoubleComponent(atomIndex, c));
-                        atom["strain_tensor"] = tensor;
+                        atom["strain_tensor"] = std::move(tensor);
                     }
                     if(defGrad){
                         json grad = json::array();
                         for(int c = 0; c < 9; c++)
                             grad.push_back(defGrad->getDoubleComponent(atomIndex, c));
-                        atom["deformation_gradient"] = grad;
+                        atom["deformation_gradient"] = std::move(grad);
                     }
                     atomsArray.push_back(std::move(atom));
                 }
-                atomsByStructure[names[st]] = atomsArray;
+                atomsByStructure[names[st]] = std::move(atomsArray);
                 structuresListing.push_back({
                     {"structure_id", st},
                     {"structure_name", names[st]},
@@ -339,9 +339,9 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
             exportWrapper["sub_listings"] = {
                 {"structures", structuresListing}
             };
-            exportWrapper["per-atom-properties"] = perAtom;
+            exportWrapper["per-atom-properties"] = result["per-atom-properties"];
             exportWrapper["export"] = json::object();
-            exportWrapper["export"]["AtomisticExporter"] = atomsByStructure;
+            exportWrapper["export"]["AtomisticExporter"] = std::move(atomsByStructure);
             const std::string atomsPath = outputFilename + "_atoms.parquet";
             JsonUtils::writeJsonToParquet(exportWrapper, atomsPath, false);
             spdlog::info("Exported atoms data to: {}", atomsPath);
