@@ -126,6 +126,10 @@ int main(int argc, char* argv[]){
         spdlog::info("Using lattice directory: {}", latticeDirectory);
     }
 
+    // Reading the input, then the analysis, the steps pluginMain takes for every other plugin.
+    JobProgress& progress = JobProgress::instance();
+    progress.beginInput();
+
     LammpsParser::Frame frame;
     if(!parseFrame(filename, frame)) return 1;
 
@@ -146,6 +150,7 @@ int main(int argc, char* argv[]){
     );
 
     spdlog::info("Starting elastic strain analysis...");
+    progress.beginAnalysis(descriptor.description);
     json result = analyzer.compute(frame, outputBase);
 
     if(result.value("is_failed", false)){
@@ -154,5 +159,6 @@ int main(int argc, char* argv[]){
     }
     
     spdlog::info("{} completed in {}.", descriptor.description, runTimer.elapsed());
+    progress.finish();
     return 0;
 }

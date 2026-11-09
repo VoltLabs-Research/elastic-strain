@@ -125,6 +125,11 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     context.inputCrystalType = _inputCrystalStructure;
 
     StructureAnalysis analysis(context);
+    // Loading the upstream structure identification, the strain, the per-atom results, the
+    // strain parquet and the atoms export, weighed by a 51k-atom FCC run (157 ms, 2 ms, 0.9 s,
+    // 0.47 s, 0.91 s): the per-atom JSON and its exports dominate.
+    ProgressSteps steps({1.0, 0.05, 6.0, 3.0, 6.0});
+    JobProgress::instance().setText("Loading the upstream structure identification");
     spdlog::info("Loading upstream structure identification (clusters, transitions, neighbor lattice)...");
     Stopwatch timer;
     std::string reconstructionError;
@@ -143,6 +148,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     const std::size_t clusterCount = analysis.clusterGraph().clusters().empty()
         ? 0 : analysis.clusterGraph().clusters().size() - 1;
     spdlog::info("Structure identification loaded in {}: {} clusters", timer.elapsed(), clusterCount);
+    steps.next();
 
     ElasticStrainEngine engine(
         analysis,
@@ -164,6 +170,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     timer.restart();
     engine.perform();
     spdlog::info("Elastic strain computed in {}", timer.elapsed());
+    steps.next("Building the per-atom results");
 
     auto volumetric = engine.volumetricStrains();
     auto strainTensor = engine.strainTensors();
@@ -229,11 +236,13 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         perAtom.push_back(a);
     }
     result["per-atom-properties"] = perAtom;
+    steps.next("Writing the elastic strain table");
 
     if(!outputFilename.empty()){
         const std::string outputPath = outputFilename + "_elastic_strain.parquet";
         JsonUtils::writeJsonToParquet(result, outputPath, false);
         spdlog::info("Elastic strain parquet written to {}", outputPath);
+        steps.next("Writing the atoms table");
 
         {
             constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
