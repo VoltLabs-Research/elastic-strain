@@ -5,6 +5,7 @@ Computes the per-atom elastic strain tensor given a crystal structure type and l
 ## Install
 
 ```bash
+npm install -g @voltstack/vpm
 vpm install @voltlabs/elastic-strain
 ```
 
