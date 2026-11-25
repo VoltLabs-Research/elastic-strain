@@ -1,61 +1,39 @@
 #include <volt/elastic_strain_service.h>
 #include <volt/elastic_strain_engine.h>
+#include <volt/elastic_strain_log.h>
 #include <volt/core/reconstructed_structure.h>
 #include <volt/core/frame_adapter.h>
 #include <volt/core/analysis_result.h>
 #include <volt/analysis/cluster_graph_io.h>
+#include <volt/analysis/structure_identification_export.h>
 #include <volt/analysis/structure_analysis.h>
 #include <volt/core/progress.h>
 #include <volt/utilities/json_utils.h>
-#include <spdlog/spdlog.h>
-#include <algorithm>
-#include <cstdint>
-#include <cstdio>
-#include <limits>
+#include <volt/utilities/written_table.h>
 #include <utility>
 
 namespace Volt{
 
 using namespace Volt::Particles;
 
-std::string structureTypeNameForExport(int structureType){
-    switch(static_cast<StructureType>(structureType)){
-        case StructureType::SC:
-            return "SC";
-        case StructureType::FCC:
-            return "FCC";
-        case StructureType::HCP:
-            return "HCP";
-        case StructureType::BCC:
-            return "BCC";
-        case StructureType::CUBIC_DIAMOND:
-            return "CUBIC_DIAMOND";
-        case StructureType::HEX_DIAMOND:
-            return "HEX_DIAMOND";
-        case StructureType::ICO:
-            return "ICO";
-        case StructureType::GRAPHENE:
-            return "GRAPHENE";
-        case StructureType::CUBIC_DIAMOND_FIRST_NEIGH:
-            return "CUBIC_DIAMOND_FIRST_NEIGH";
-        case StructureType::CUBIC_DIAMOND_SECOND_NEIGH:
-            return "CUBIC_DIAMOND_SECOND_NEIGH";
-        case StructureType::HEX_DIAMOND_FIRST_NEIGH:
-            return "HEX_DIAMOND_FIRST_NEIGH";
-        case StructureType::HEX_DIAMOND_SECOND_NEIGH:
-            return "HEX_DIAMOND_SECOND_NEIGH";
-        case StructureType::OTHER:
-        case StructureType::NUM_STRUCTURE_TYPES:
-        default:
-            return "OTHER";
-    }
-}
+const OutputFile<ElasticStrainService, ElasticStrainService::Outputs> ElasticStrainService::outputFiles[] = {
+    {"Writing the elastic strain table", 3.0, nullptr, [](const Outputs& out){
+        out.log.dump(JsonUtils::writeSummaryTable(out.result, out.base, "elastic_strain", "Elastic strain"));
+    }},
+    {"Writing the atoms table", 6.0, nullptr, [](const Outputs& out){
+        const AtomStructures structures = atomStructures(out);
+        out.log.dump(structures);
+        const AtomsTable atoms{outputPath(out.base, "atoms")};
+        JsonUtils::writeJsonToParquet(atomsTable(out, structures), atoms.path, false);
+        out.log.dump(atoms);
+    }},
+};
 
-std::vector<int> buildAtomStructureTypes(const StructureAnalysis& analysis, std::size_t atomCount){
+std::vector<int> ElasticStrainService::atomStructureTypes(const StructureAnalysis& analysis, std::size_t atomCount){
     std::vector<int> structureTypes(atomCount, static_cast<int>(StructureType::OTHER));
     for(std::size_t atomIndex = 0; atomIndex < atomCount; ++atomIndex){
         Cluster* cluster = analysis.atomCluster(static_cast<int>(atomIndex));
-        if(cluster){
+        if(cluster && 0 <= cluster->structure && cluster->structure < static_cast<int>(StructureType::NUM_STRUCTURE_TYPES)){
             structureTypes[atomIndex] = cluster->structure;
         }
     }
@@ -86,23 +64,27 @@ void ElasticStrainService::setNeighborLatticePath(std::string path){
     _neighborLatticePath = std::move(path);
 }
 
-void ElasticStrainService::setParameters(
-    double latticeConstant,
-    double caRatio,
-    bool pushForward,
-    bool calculateDeformationGradient,
-    bool calculateStrainTensors
-){
+void ElasticStrainService::setLatticeConstant(double latticeConstant){
     _latticeConstant = latticeConstant;
+}
+
+void ElasticStrainService::setCaRatio(double caRatio){
     _caRatio = caRatio;
+}
+
+void ElasticStrainService::setPushForward(bool pushForward){
     _pushForward = pushForward;
+}
+
+void ElasticStrainService::setCalculateDeformationGradient(bool calculateDeformationGradient){
     _calculateDeformationGradient = calculateDeformationGradient;
+}
+
+void ElasticStrainService::setCalculateStrainTensors(bool calculateStrainTensors){
     _calculateStrainTensors = calculateStrainTensors;
 }
 
 json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::string &outputFilename){
-    auto startTime = std::chrono::high_resolution_clock::now();
-
     if(_clustersTablePath.empty() || _clusterTransitionsPath.empty()){
         return AnalysisResult::failure(
             "ElasticStrain requires --clusters_table and --clusters_transitions"
@@ -114,6 +96,7 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         );
     }
 
+    ElasticStrainLog log;
     FrameAdapter::PreparedAnalysisInput prepared;
     std::string frameError;
     if(!FrameAdapter::prepareAnalysisInput(frame, prepared, &frameError))
@@ -125,13 +108,14 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
     context.inputCrystalType = _inputCrystalStructure;
 
     StructureAnalysis analysis(context);
-    // Loading the upstream structure identification, the strain, the per-atom results, the
-    // strain parquet and the atoms export, weighed by a 51k-atom FCC run (157 ms, 2 ms, 0.9 s,
-    // 0.47 s, 0.91 s): the per-atom JSON and its exports dominate.
-    ProgressSteps steps({1.0, 0.05, 6.0, 3.0, 6.0});
-    JobProgress::instance().setText("Loading the upstream structure identification");
-    spdlog::info("Loading upstream structure identification (clusters, transitions, neighbor lattice)...");
-    Stopwatch timer;
+    // Weighed by a 51k-atom FCC run (157 ms, 2 ms, 0.9 s, 0.47 s, 0.91 s): the per-atom JSON
+    // and its exports dominate.
+    ProgressSteps steps({
+        {"Loading the upstream structure identification", 1.0},
+        {"Computing elastic strain", 0.05},
+        {"Building the per-atom results", 6.0},
+        {"Writing outputs", totalWeight(outputSteps(outputFiles, *this))},
+    });
     std::string reconstructionError;
     if(!ReconstructedStructureLoader::load(
         frame,
@@ -144,12 +128,9 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         return AnalysisResult::failure(reconstructionError);
     }
     rebuildImportedClusterParentHierarchy(analysis);
-    // The cluster graph always holds the null cluster 0.
-    const std::size_t clusterCount = analysis.clusterGraph().clusters().empty()
-        ? 0 : analysis.clusterGraph().clusters().size() - 1;
-    spdlog::info("Structure identification loaded in {}: {} clusters", timer.elapsed(), clusterCount);
-    steps.next();
+    log.dump(analysis);
 
+    steps.next();
     ElasticStrainEngine engine(
         analysis,
         context,
@@ -160,49 +141,40 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         _caRatio,
         _pushForward
     );
-
-    spdlog::info(
-        "Computing elastic strain for {} atoms ({} reference lattice, {})...",
-        context.atomCount(),
-        latticeStructureTypeName(_inputCrystalStructure),
-        _pushForward ? "Euler-Almansi strain in the spatial frame" : "Green-Lagrange strain in the lattice frame"
-    );
-    timer.restart();
     engine.perform();
-    spdlog::info("Elastic strain computed in {}", timer.elapsed());
-    steps.next("Building the per-atom results");
+    log.dump(engine);
 
+    steps.next();
+    const std::vector<int> structureTypes = atomStructureTypes(analysis, static_cast<std::size_t>(frame.natoms));
+    json result = perAtomResults(frame, analysis, engine, structureTypes);
+
+    steps.next();
+    const Outputs outputs{outputFilename, frame, analysis, engine, structureTypes, result, _inputCrystalStructure, log};
+    if(!outputFilename.empty()){
+        writeOutputFiles(outputFiles, *this, outputs);
+    }
+    log.dump(outputs);
+    return result;
+}
+
+json ElasticStrainService::perAtomResults(
+    const LammpsParser::Frame& frame,
+    const StructureAnalysis& analysis,
+    const ElasticStrainEngine& engine,
+    const std::vector<int>& structureTypes
+){
     auto volumetric = engine.volumetricStrains();
     auto strainTensor = engine.strainTensors();
     auto defGrad = engine.deformationGradients();
 
     const size_t n = static_cast<size_t>(frame.natoms);
-    const std::vector<int> atomStructureTypes = buildAtomStructureTypes(analysis, n);
-    const auto structureTypeAt = [&atomStructureTypes](size_t i){
-        const int raw = atomStructureTypes[i];
-        return (0 <= raw && raw < static_cast<int>(StructureType::NUM_STRUCTURE_TYPES))
-            ? raw : static_cast<int>(StructureType::OTHER);
-    };
     double totalVolumetric = 0.0;
-    double minVolumetric = std::numeric_limits<double>::infinity();
-    double maxVolumetric = -std::numeric_limits<double>::infinity();
     for(size_t i = 0; i < n; i++){
         if(volumetric){
-            const double value = volumetric->getDouble(i);
-            totalVolumetric += value;
-            minVolumetric = std::min(minVolumetric, value);
-            maxVolumetric = std::max(maxVolumetric, value);
+            totalVolumetric += volumetric->getDouble(i);
         }
     }
-    if(volumetric && n > 0){
-        spdlog::info(
-            "Volumetric strain: min {:.6f}, mean {:.6f}, max {:.6f}",
-            minVolumetric, totalVolumetric / n, maxVolumetric
-        );
-    }
 
-    spdlog::info("Writing per-atom results for {} atoms...", n);
-    timer.restart();
     json result;
     result["main_listing"] = {
         { "average_volumetric_strain", n > 0 ? totalVolumetric / n : 0.0 }
@@ -215,9 +187,9 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
 
         Cluster* cluster = analysis.atomCluster(static_cast<int>(i));
         a["cluster_id"] = cluster ? cluster->id : 0;
-        const int structureType = structureTypeAt(i);
+        const int structureType = structureTypes[i];
         a["structure_id"] = structureType;
-        a["structure_name"] = structureTypeNameForExport(structureType);
+        a["structure_name"] = StructureIdentificationExport::structureTypeNameForExport(structureType);
 
         if(volumetric) a["volumetric_strain"] = volumetric->getDouble(i);
 
@@ -236,119 +208,45 @@ json ElasticStrainService::compute(const LammpsParser::Frame &frame, const std::
         perAtom.push_back(std::move(a));
     }
     result["per-atom-properties"] = std::move(perAtom);
-    steps.next("Writing the elastic strain table");
-
-    if(!outputFilename.empty()){
-        const std::string outputPath = outputFilename + "_elastic_strain.parquet";
-        JsonUtils::writeJsonToParquet(result, outputPath, false);
-        spdlog::info("Elastic strain parquet written to {}", outputPath);
-        steps.next("Writing the atoms table");
-
-        {
-            constexpr int K = static_cast<int>(StructureType::NUM_STRUCTURE_TYPES);
-            std::vector<std::string> names(K);
-            for(int st = 0; st < K; st++)
-                names[st] = structureTypeNameForExport(st);
-
-            std::vector<std::vector<size_t>> structureAtomIndices(K);
-            for(size_t i = 0; i < n; ++i)
-                structureAtomIndices[static_cast<size_t>(structureTypeAt(i))].push_back(i);
-
-            std::vector<int> structureOrder;
-            structureOrder.reserve(K);
-            for(int st = 0; st < K; st++){
-                if(!structureAtomIndices[static_cast<size_t>(st)].empty())
-                    structureOrder.push_back(st);
-            }
-            std::sort(structureOrder.begin(), structureOrder.end(),
-                [&](int a, int b){ return names[a] < names[b]; });
-
-            int clusteredAtoms = 0;
-            for(size_t i = 0; i < n; ++i){
-                Cluster* cluster = analysis.atomCluster(static_cast<int>(i));
-                if(cluster && cluster->id != 0) ++clusteredAtoms;
-            }
-
-            std::string structureSummary;
-            for(int st : structureOrder){
-                const size_t count = structureAtomIndices[static_cast<size_t>(st)].size();
-                const char* name = st == static_cast<int>(StructureType::OTHER) ? "Other" : names[st].c_str();
-                char entry[96];
-                std::snprintf(entry, sizeof(entry), "%s%s %zu (%.1f%%)",
-                    structureSummary.empty() ? "" : ", ", name, count, percentOf(count, n));
-                structureSummary += entry;
-            }
-            spdlog::info(
-                "Structure types: {}; {} atoms in clusters ({:.1f}%)",
-                structureSummary, clusteredAtoms, percentOf(static_cast<std::uint64_t>(clusteredAtoms), n)
-            );
-            if(n > 0 && structureAtomIndices[static_cast<size_t>(_inputCrystalStructure)].empty()){
-                spdlog::warn(
-                    "No atom is in a cluster of the {} reference structure, so every elastic strain is zero; check crystal_structure",
-                    latticeStructureTypeName(_inputCrystalStructure)
-                );
-            }
-
-            json structuresListing = json::array();
-            json atomsByStructure;
-            for(int st : structureOrder){
-                json atomsArray = json::array();
-                for(size_t atomIndex : structureAtomIndices[static_cast<size_t>(st)]){
-                    const Point3& pos = frame.positions[atomIndex];
-                    Cluster* cluster = analysis.atomCluster(static_cast<int>(atomIndex));
-                    const int clusterId = cluster ? cluster->id : 0;
-                    json atom = {
-                        {"id", frame.ids[atomIndex]},
-                        {"pos", {pos.x(), pos.y(), pos.z()}},
-                        {"structure_id", st},
-                        {"structure_name", names[st]},
-                        {"cluster_id", clusterId}
-                    };
-                    if(volumetric){
-                        atom["volumetric_strain"] = volumetric->getDouble(atomIndex);
-                    }
-                    if(strainTensor){
-                        json tensor = json::array();
-                        for(int c = 0; c < 6; c++)
-                            tensor.push_back(strainTensor->getDoubleComponent(atomIndex, c));
-                        atom["strain_tensor"] = std::move(tensor);
-                    }
-                    if(defGrad){
-                        json grad = json::array();
-                        for(int c = 0; c < 9; c++)
-                            grad.push_back(defGrad->getDoubleComponent(atomIndex, c));
-                        atom["deformation_gradient"] = std::move(grad);
-                    }
-                    atomsArray.push_back(std::move(atom));
-                }
-                atomsByStructure[names[st]] = std::move(atomsArray);
-                structuresListing.push_back({
-                    {"structure_id", st},
-                    {"structure_name", names[st]},
-                    {"atom_count", static_cast<int>(structureAtomIndices[static_cast<size_t>(st)].size())}
-                });
-            }
-
-            json exportWrapper;
-            exportWrapper["main_listing"] = {
-                {"total_atoms", frame.natoms},
-                {"structure_count", static_cast<int>(structureOrder.size())},
-                {"clustered_atoms", clusteredAtoms},
-                {"unclustered_atoms", frame.natoms - clusteredAtoms}
-            };
-            exportWrapper["sub_listings"] = {
-                {"structures", structuresListing}
-            };
-            exportWrapper["per-atom-properties"] = result["per-atom-properties"];
-            exportWrapper["export"] = json::object();
-            exportWrapper["export"]["AtomisticExporter"] = std::move(atomsByStructure);
-            const std::string atomsPath = outputFilename + "_atoms.parquet";
-            JsonUtils::writeJsonToParquet(exportWrapper, atomsPath, false);
-            spdlog::info("Exported atoms data to: {}", atomsPath);
-        }
-    }
-
-    spdlog::info("Per-atom results written in {}", timer.elapsed());
     return result;
 }
+
+ElasticStrainService::AtomStructures ElasticStrainService::atomStructures(const Outputs& outputs){
+    return {
+        StructureIdentificationExport::groupAtomsByStructure(outputs.structureTypes, [&](std::size_t atomIndex){
+            Cluster* cluster = outputs.analysis.atomCluster(static_cast<int>(atomIndex));
+            return cluster && cluster->id != 0;
+        }),
+        outputs.referenceStructure
+    };
+}
+
+json ElasticStrainService::atomsTable(const Outputs& outputs, const AtomStructures& structures){
+    auto volumetric = outputs.engine.volumetricStrains();
+    auto strainTensor = outputs.engine.strainTensors();
+    auto defGrad = outputs.engine.deformationGradients();
+    json table = StructureIdentificationExport::atomsByStructureTable(outputs.frame, structures.byStructure,
+        [&](json& atom, std::size_t atomIndex){
+            Cluster* cluster = outputs.analysis.atomCluster(static_cast<int>(atomIndex));
+            atom["cluster_id"] = cluster ? cluster->id : 0;
+            if(volumetric){
+                atom["volumetric_strain"] = volumetric->getDouble(atomIndex);
+            }
+            if(strainTensor){
+                json tensor = json::array();
+                for(int c = 0; c < 6; c++)
+                    tensor.push_back(strainTensor->getDoubleComponent(atomIndex, c));
+                atom["strain_tensor"] = std::move(tensor);
+            }
+            if(defGrad){
+                json grad = json::array();
+                for(int c = 0; c < 9; c++)
+                    grad.push_back(defGrad->getDoubleComponent(atomIndex, c));
+                atom["deformation_gradient"] = std::move(grad);
+            }
+        });
+    table["per-atom-properties"] = outputs.result["per-atom-properties"];
+    return table;
+}
+
 }
